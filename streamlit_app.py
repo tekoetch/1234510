@@ -3,11 +3,27 @@ from ddgs import DDGS
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timezone
+import gspread
+from google.oauth2.service_account import Credentials
+import os
 
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Dashboard testing")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
+
+Scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+if "GCP_SERVICE_ACCOUNT_JSON" in st.secrets: 
+    creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
+    credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
+else:
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+
+gc = gspread.authorize(credentials)
 
 display_col = {
     "result_id": "Result ID",
@@ -127,7 +143,12 @@ else:
 if not combined_df.empty and len(new_df) > 0:
     combined_df.columns = [str(c) for c in combined_df.columns]
     display_df = combined_df.rename(columns=display_col)
-    conn.send(df = display_df, worksheet = "Sheet1", mode = "overwrite")
+    sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
+    sh = gc.open_by_url(sheet_url)
+    worksheet = sh.worksheet("Sheet1")
+    values = [display_df.columns.values.tolist()] + display_df.values.tolist()
+    worksheet.clear()
+    worksheet.update(values)
     st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 else:
     st.warning("Nothing new found.")
