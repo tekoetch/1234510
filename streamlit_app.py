@@ -55,12 +55,10 @@ internal_col = [
 existing_df = existing_df.reindex(columns=internal_col)
 
 group_a = ["angel investor", "angel investing", "family office",
-           "private investor", "early-stage investor", "venture investor"
-]
+           "private investor", "early-stage investor", "venture investor"]
 
 group_b = ["investment", "portfolio", "funding", "capital",
-           "backing startups", "exited", "seed", "pre-seed"
-]
+           "backing startups", "exited", "seed", "pre-seed"]
 
 group_c = ["uae", "dubai", "abu dhabi", "middle east"]
 
@@ -68,16 +66,12 @@ group_d = ["founder", "chairman", "partner","principal", "managing director"]
 
 def classify_result(text):
     text = text.lower()
-
     if any(k in text for k in group_a):
         return "Green"
-
     if any(k in text for k in group_b) and any(k in text for k in group_c):
         return "Green"
-
     if any(k in text for k in group_b) or any(k in text for k in group_d):
         return "Red"
-
     return "Discard"
 
 queries = [
@@ -87,18 +81,14 @@ queries = [
     "early-stage investor Middle East"
 ]
 
-results = []
-
-if st.button("Run Discovery"):
-    if st.button("Run Discovery"):
-        st.write("Button clicked")
-
+if st.button("Run Discovery", key="run_discovery_button"):
+    st.write("Button clicked")
     results = []
 
-    with DDGS() as ddgs:
+    with DDGS(timeout=10) as ddgs:
         for query in queries:
             st.write("Running query:", query)
-            for r in ddgs.text(query, max_results=20):
+            for r in ddgs.text(query, max_results=20, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -119,8 +109,7 @@ if st.button("Run Discovery"):
                     "first_seen": now,
                     "last_checked": now
                 })
-                st.write("Found result")
-
+                st.write("Found result:", title) 
 
 new_df = pd.DataFrame(results)
 new_df = new_df.reindex(columns=internal_col)
@@ -135,30 +124,16 @@ else:
     combined_df = new_df
 
 if not combined_df.empty and len(new_df) > 0:
-    combined_df.columns = [str(c) for c in combined_df.columns]
-
     display_df = combined_df.rename(columns=display_col)
-
-    conn.write(
-        display_df,
-        worksheet="Sheet1",
-        overwrite=True
-    )
-
+    conn.write(display_df, worksheet="Sheet1", overwrite=True)
     st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 else:
     st.warning("Nothing new found.")
 
-
-if (
-    "combined_df" in locals()
-    and not combined_df.empty
-    and "first_seen" in combined_df.columns
-):
+if "combined_df" in locals() and not combined_df.empty and "first_seen" in combined_df.columns:
     st.dataframe(
         combined_df.sort_values("first_seen", ascending=False),
         use_container_width=True
     )
 else:
     st.info("No data to display yet. Click the 'Run Discovery' button.")
-
