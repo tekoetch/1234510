@@ -90,10 +90,14 @@ queries = [
 results = []
 
 if st.button("Run Discovery"):
+    if st.button("Run Discovery"):
+        st.write("Button clicked")
+
     results = []
 
     with DDGS() as ddgs:
         for query in queries:
+            st.write("Running query:", query)
             for r in ddgs.text(query, max_results=20):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
@@ -115,6 +119,8 @@ if st.button("Run Discovery"):
                     "first_seen": now,
                     "last_checked": now
                 })
+                st.write("Found result")
+
 
 new_df = pd.DataFrame(results)
 new_df = new_df.reindex(columns=internal_col)
