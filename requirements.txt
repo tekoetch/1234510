@@ -1,6 +1,6 @@
 streamlit
 pandas
-duckduckgo-search
+ddgs
 oauth2client
 st-gsheets-connection
 gspread
