@@ -21,7 +21,7 @@ if "GCP_SERVICE_ACCOUNT_JSON" in st.secrets:
     creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
     credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
 else:
-    credentials = Credentials.from_service_account_file("service_account.json", scopes=SCOPES)
+    credentials = Credentials.from_service_account_file("service_account.json", scopes=Scopes)
 
 gc = gspread.authorize(credentials)
 
