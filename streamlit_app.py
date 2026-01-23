@@ -75,10 +75,10 @@ def classify_result(text):
     return "Discard"
 
 queries = [
-    "angel investor UAE",
-    "family office Dubai",
-    "private investor Abu Dhabi",
-    "early-stage investor Middle East"
+    "angel investor UAE site:linkedin.com/in",
+    "family office Dubai site:linkedin.com/in",
+    "private investor Abu Dhabi site:linkedin.com/in",
+    "early-stage investor Middle East site:linkedin.com/in"
 ]
 
 results = []
@@ -89,7 +89,7 @@ if st.button("Run Discovery", key="run_discovery_button"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
             st.write("Running query:", query)
-            for r in ddgs.text(query, max_results=20, backend="html"):
+            for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -125,8 +125,9 @@ else:
     combined_df = new_df
 
 if not combined_df.empty and len(new_df) > 0:
+    combined_df.columns = [str(c) for c in combined_df.columns]
     display_df = combined_df.rename(columns=display_col)
-    conn.write(display_df, worksheet="Sheet1", overwrite=True)
+    conn.send(df = display_df, worksheet = "Sheet1", mode = "overwrite")
     st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 else:
     st.warning("Nothing new found.")
