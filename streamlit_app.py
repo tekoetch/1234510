@@ -81,9 +81,13 @@ queries = [
     "early-stage investor Middle East"
 ]
 
+results = []
+
+# --- define results first, outside the button ---
+results = []
+
 if st.button("Run Discovery", key="run_discovery_button"):
     st.write("Button clicked")
-    results = []
 
     with DDGS(timeout=10) as ddgs:
         for query in queries:
@@ -109,7 +113,7 @@ if st.button("Run Discovery", key="run_discovery_button"):
                     "first_seen": now,
                     "last_checked": now
                 })
-                st.write("Found result:", title) 
+                st.write("Found result:", title)
 
 new_df = pd.DataFrame(results)
 new_df = new_df.reindex(columns=internal_col)
