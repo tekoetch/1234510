@@ -2,7 +2,7 @@ import streamlit as st
 from duckduckgo_search import DDGS
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Dashboard testing")
@@ -40,6 +40,19 @@ existing_df.columns = (
     .str.lower()
     .str.replace(" ", "_")
 )
+
+internal_col = [
+    "result_id",
+    "query_used",
+    "title",
+    "snippet",
+    "url",
+    "classification",
+    "first_seen",
+    "last_checked",
+]
+
+existing_df = existing_df.reindex(columns=internal_col)
 
 group_a = ["angel investor", "angel investing", "family office",
            "private investor", "early-stage investor", "venture investor"
@@ -114,7 +127,7 @@ if not existing_df.empty:
 else:
     combined_df = new_df
 
-if not combined_df.empty:
+if not combined_df.empty and len(new_df) > 0:
     combined_df.columns = [str(c) for c in combined_df.columns]
 
     display_df = combined_df.rename(columns=display_col)
