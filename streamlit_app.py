@@ -56,6 +56,8 @@ queries = [
     "early-stage investor Middle East"
 ]
 
+results = []
+
 if st.button("Run Discovery"):
     results = []
 
@@ -98,4 +100,3 @@ st.dataframe(
     combined_df.sort_values("First Seen", ascending=False),
     use_container_width=True
 )
-
