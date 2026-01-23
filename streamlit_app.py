@@ -96,14 +96,19 @@ if not existing_df.empty:
 else:
     combined_df = new_df
 
-if not combined_df.empty and len(combined_df.columns) > 0:
-    conn.update(worksheet="Sheet1", data=combined_df)
+if not combined_df.empty:
+    combined_df.columns = [str(c) for c in combined_df.columns]
+
+    conn.write(
+        combined_df,
+        worksheet="Sheet1",
+        overwrite=True
+    )
+
     st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 else:
     st.warning("Nothing new found.")
 
-conn.update(worksheet="Sheet1", data=combined_df)
-st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 
 st.dataframe(
     combined_df.sort_values("First Seen", ascending=False),
