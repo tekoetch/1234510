@@ -87,14 +87,23 @@ if st.button("Run Discovery"):
 
 new_df = pd.DataFrame(results)
 
+if new_df.empty:
+    st.info("No results found.")
+
 if not existing_df.empty:
     combined_df = pd.concat([existing_df, new_df])
     combined_df = combined_df.drop_duplicates(subset="Result ID", keep="first")
 else:
     combined_df = new_df
 
+if not combined_df.empty and len(combined_df.columns) > 0:
+    conn.update(worksheet="Sheet1", data=combined_df)
+    st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
+else:
+    st.warning("Nothing new found.")
+
 conn.update(worksheet="Sheet1", data=combined_df)
-st.success(f"Stored {len(new_df)} results. Total: {len(combined_df)}")
+st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
 
 st.dataframe(
     combined_df.sort_values("First Seen", ascending=False),
