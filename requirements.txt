@@ -1,0 +1,7 @@
+streamlit
+pandas
+duckduckgo-search
+oauth2client
+st-gsheets-connection
+gspread
+google-auth
