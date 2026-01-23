@@ -9,6 +9,17 @@ st.title("Dashboard testing")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+display_col = {
+    "result_id": "Result ID",
+    "query_used": "Query Used",
+    "title": "Title",
+    "snippet": "Snippet",
+    "url": "URL",
+    "classification": "Classification",
+    "first_seen": "First Seen",
+    "last_checked": "Last Checked",
+}
+
 try:
     existing_df = conn.read(worksheet="Sheet1")
 except Exception:
@@ -22,6 +33,13 @@ except Exception:
         "First Seen",
         "Last Checked"
     ])
+
+existing_df.columns = (
+    existing_df.columns
+    .str.strip()
+    .str.lower()
+    .str.replace(" ", "_")
+)
 
 group_a = ["angel investor", "angel investing", "family office",
            "private investor", "early-stage investor", "venture investor"
@@ -75,14 +93,14 @@ if st.button("Run Discovery"):
                 now = datetime.now(timezone.utc).isoformat()
 
                 results.append({
-                    "Result ID": result_id,
-                    "Query Used": query,
-                    "Title": title,
-                    "Snippet": snippet,
-                    "URL": url,
-                    "Classification": classification,
-                    "First Seen": now,
-                    "Last Checked": now
+                    "result_id": result_id,
+                    "query_used": query,
+                    "title": title,
+                    "snippet": snippet,
+                    "url": url,
+                    "classification": classification,
+                    "first_seen": now,
+                    "last_checked": now
                 })
 
 new_df = pd.DataFrame(results)
@@ -92,15 +110,17 @@ if new_df.empty:
 
 if not existing_df.empty:
     combined_df = pd.concat([existing_df, new_df])
-    combined_df = combined_df.drop_duplicates(subset="Result ID", keep="first")
+    combined_df = combined_df.drop_duplicates(subset="result_id", keep="first")
 else:
     combined_df = new_df
 
 if not combined_df.empty:
     combined_df.columns = [str(c) for c in combined_df.columns]
 
+    display_df = combined_df.rename(columns=display_col)
+
     conn.write(
-        combined_df,
+        display_df,
         worksheet="Sheet1",
         overwrite=True
     )
@@ -111,6 +131,6 @@ else:
 
 
 st.dataframe(
-    combined_df.sort_values("First Seen", ascending=False),
+    combined_df.sort_values("first_seen", ascending=False),
     use_container_width=True
 )
