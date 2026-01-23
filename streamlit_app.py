@@ -17,11 +17,8 @@ Scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-if "GCP_SERVICE_ACCOUNT_JSON" in st.secrets: 
-    creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
-    credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-else:
-    credentials = Credentials.from_service_account_file("service_account.json", scopes=Scopes)
+creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
+credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
 
 gc = gspread.authorize(credentials)
 
