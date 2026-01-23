@@ -1,5 +1,5 @@
 import streamlit as st
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timezone
@@ -81,9 +81,6 @@ queries = [
     "early-stage investor Middle East"
 ]
 
-results = []
-
-# --- define results first, outside the button ---
 results = []
 
 if st.button("Run Discovery", key="run_discovery_button"):
