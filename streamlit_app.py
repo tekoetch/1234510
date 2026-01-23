@@ -117,6 +117,7 @@ if st.button("Run Discovery"):
                 })
 
 new_df = pd.DataFrame(results)
+new_df = new_df.reindex(columns=internal_col)
 
 if new_df.empty:
     st.info("No results found.")
@@ -143,7 +144,15 @@ else:
     st.warning("Nothing new found.")
 
 
-st.dataframe(
-    combined_df.sort_values("first_seen", ascending=False),
-    use_container_width=True
-)
+if (
+    "combined_df" in locals()
+    and not combined_df.empty
+    and "first_seen" in combined_df.columns
+):
+    st.dataframe(
+        combined_df.sort_values("first_seen", ascending=False),
+        use_container_width=True
+    )
+else:
+    st.info("No data to display yet. Click the 'Run Discovery' button.")
+
