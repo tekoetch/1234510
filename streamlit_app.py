@@ -60,9 +60,12 @@ internal_col = [
     "title",
     "snippet",
     "url",
-    "classification",
     "first_seen",
     "last_checked",
+    "score",
+    "confidence_level",
+    "matched_keywords",
+    "signal_breakdown",
 ]
 
 existing_df = existing_df.reindex(columns=internal_col)
@@ -77,6 +80,10 @@ group_c = ["uae", "dubai", "abu dhabi", "middle east"]
 
 group_d = ["founder", "chairman", "partner","principal", "managing director"]
 
+uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
+
+mena_keywords = ["uae", "dubai", "abu dhabi", "emirates", "middle east", "mena"]
+
 def classify_result(text):
     text = text.lower()
     if any(k in text for k in group_a):
@@ -86,6 +93,54 @@ def classify_result(text):
     if any(k in text for k in group_b) or any(k in text for k in group_d):
         return "Red"
     return "Discard"
+
+def score_result(text):
+    text = text.lower()
+
+    score = 1
+    matched_keywords = []
+    signal_breakdown = []
+
+    if any(k in text for k in mena_keywords):
+        signal_breakdown.append("MENA presence")
+    else:
+        return {
+            "score": 1,
+            "confidence": "Low",
+            "matched_keywords": [],
+            "signal_breakdown": ["No MENA signal"]
+        }
+
+    if any(k in text for k in uae_keywords):
+        score += 6
+        signal_breakdown.append("UAE presence")
+
+    if any(k in text for k in group_a):
+        score += 3
+        signal_breakdown.append("Angel / Family Office signal")
+    elif any(k in text for k in group_b):
+        score += 2
+        signal_breakdown.append("Investment activity signal")
+
+    if any(k in text for k in group_d):
+        score += 2
+        signal_breakdown.append("Senior role/title")
+
+    score = min(score, 10)
+
+    if score >= 8:
+        confidence = "High"
+    elif score >= 5:
+        confidence = "Medium"
+    else:
+        confidence = "Low"
+
+    return {
+        "score": score,
+        "confidence": confidence,
+        "matched_keywords": list(set([k for k in mena_keywords + group_a + group_b + group_d if k in text])),
+        "signal_breakdown": signal_breakdown
+    }
 
 queries = [
     "angel investor UAE site:linkedin.com/in",
@@ -108,7 +163,7 @@ if st.button("Run Discovery", key="run_discovery_button"):
                 url = r.get("href", "")
 
                 combined_text = f"{title} {snippet}"
-                classification = classify_result(combined_text)
+                scoring = score_result(combined_text)
 
                 result_id = url.strip().lower()
                 now = datetime.now(timezone.utc).isoformat()
@@ -119,9 +174,12 @@ if st.button("Run Discovery", key="run_discovery_button"):
                     "title": title,
                     "snippet": snippet,
                     "url": url,
-                    "classification": classification,
                     "first_seen": now,
-                    "last_checked": now
+                    "last_checked": now,
+                    "score": scoring["score"],
+                    "confidence_level": scoring["confidence"],
+                    "matched_keywords": ", ".join(scoring["matched_keywords"]),
+                    "signal_breakdown": " | ".join(scoring["signal_breakdown"])
                 })
                 st.write("Found result:", title)
 
