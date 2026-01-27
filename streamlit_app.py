@@ -5,10 +5,9 @@ import pandas as pd
 from datetime import datetime, timezone
 import gspread
 from google.oauth2.service_account import Credentials
-import os
 
-st.set_page_config(page_title="Leads Dashboard", layout="wide")
-st.title("Dashboard testing")
+st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
+st.title("Leads Discovery + Scoring Playground")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -19,112 +18,44 @@ Scopes = [
 
 creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
 credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-
 gc = gspread.authorize(credentials)
-
-display_col = {
-    "result_id": "Result ID",
-    "query_used": "Query Used",
-    "title": "Title",
-    "snippet": "Snippet",
-    "url": "URL",
-    "classification": "Classification",
-    "first_seen": "First Seen",
-    "last_checked": "Last Checked",
-}
-
-try:
-    existing_df = conn.read(worksheet="Sheet1")
-except Exception:
-    existing_df = pd.DataFrame(columns=[
-        "Result ID",
-        "Query Used",
-        "Title",
-        "Snippet",
-        "URL",
-        "Classification",
-        "First Seen",
-        "Last Checked"
-    ])
-
-existing_df.columns = (
-    existing_df.columns
-    .str.strip()
-    .str.lower()
-    .str.replace(" ", "_")
-)
-
-internal_col = [
-    "result_id",
-    "query_used",
-    "title",
-    "snippet",
-    "url",
-    "first_seen",
-    "last_checked",
-    "score",
-    "confidence_level",
-    "matched_keywords",
-    "signal_breakdown",
-]
-
-existing_df = existing_df.reindex(columns=internal_col)
 
 group_a = ["angel investor", "angel investing", "family office",
            "private investor", "early-stage investor", "venture investor"]
 
 group_b = ["investment", "portfolio", "funding", "capital",
-           "backing startups", "exited", "seed", "pre-seed"]
+           "seed", "pre-seed"]
 
-group_c = ["uae", "dubai", "abu dhabi", "middle east"]
-
-group_d = ["founder", "chairman", "partner","principal", "managing director"]
+group_d = ["founder", "chairman", "partner", "principal", "managing director"]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
+mena_keywords = ["mena", "middle east", "uae", "dubai", "abu dhabi"]
 
-mena_keywords = ["uae", "dubai", "abu dhabi", "emirates", "middle east", "mena"]
-
-def classify_result(text):
+def score_text(text, weights):
     text = text.lower()
-    if any(k in text for k in group_a):
-        return "Green"
-    if any(k in text for k in group_b) and any(k in text for k in group_c):
-        return "Green"
-    if any(k in text for k in group_b) or any(k in text for k in group_d):
-        return "Red"
-    return "Discard"
-
-def score_result(text):
-    text = text.lower()
-
     score = 1
-    matched_keywords = []
-    signal_breakdown = []
+    breakdown = []
 
     if any(k in text for k in mena_keywords):
-        signal_breakdown.append("MENA presence")
+        score += weights["mena"]
+        breakdown.append("MENA presence")
     else:
-        return {
-            "score": 1,
-            "confidence": "Low",
-            "matched_keywords": [],
-            "signal_breakdown": ["No MENA signal"]
-        }
+        return score, "Low", ["No MENA signal"]
 
     if any(k in text for k in uae_keywords):
-        score += 6
-        signal_breakdown.append("UAE presence")
+        score += weights["uae"]
+        breakdown.append("UAE presence")
 
     if any(k in text for k in group_a):
-        score += 3
-        signal_breakdown.append("Angel / Family Office signal")
+        score += weights["angel"]
+        breakdown.append("Angel / FO signal")
     elif any(k in text for k in group_b):
-        score += 2
-        signal_breakdown.append("Investment activity signal")
+        score += weights["investment"]
+        breakdown.append("Investment activity")
 
     if any(k in text for k in group_d):
-        score += 2
-        signal_breakdown.append("Senior role/title")
+        score += weights["seniority"]
+        breakdown.append("Senior role")
 
     score = min(score, 10)
 
@@ -135,83 +66,69 @@ def score_result(text):
     else:
         confidence = "Low"
 
-    return {
-        "score": score,
-        "confidence": confidence,
-        "matched_keywords": list(set([k for k in mena_keywords + group_a + group_b + group_d if k in text])),
-        "signal_breakdown": signal_breakdown
-    }
+    return score, confidence, breakdown
+
+st.sidebar.header("🎛️ Scoring Playground")
+
+weights = {
+    "mena": st.sidebar.slider("MENA Weight", 0, 5, 1),
+    "uae": st.sidebar.slider("UAE Weight", 0, 8, 6),
+    "angel": st.sidebar.slider("Angel / FO Weight", 0, 5, 3),
+    "investment": st.sidebar.slider("Investment Weight", 0, 5, 2),
+    "seniority": st.sidebar.slider("Seniority Weight", 0, 5, 2),
+}
+
+freeze_scoring = st.sidebar.checkbox("Freeze scoring (no changes)", value=False)
+
+st.subheader("🧪 Scoring Playground")
+
+sample_text = st.text_area(
+    "Paste a real LinkedIn title + snippet here",
+    height=150,
+    placeholder="Angel Investor | Based in Dubai | Early-stage FinTech & SaaS"
+)
+
+if sample_text:
+    if freeze_scoring:
+        st.warning("Scoring is frozen")
+    score, confidence, breakdown = score_text(sample_text, weights)
+
+    st.metric("Score", score)
+    st.metric("Confidence", confidence)
+    st.write("Signals:", " | ".join(breakdown))
 
 queries = [
-    "angel investor UAE site:linkedin.com/in",
-    "family office Dubai site:linkedin.com/in",
-    "private investor Abu Dhabi site:linkedin.com/in",
-    "early-stage investor Middle East site:linkedin.com/in"
+    '"angel investor" UAE site:linkedin.com/in',
+    '"family office" Dubai site:linkedin.com/in',
 ]
+
+st.subheader("🔍 Live Discovery")
 
 results = []
 
-if st.button("Run Discovery", key="run_discovery_button"):
-    st.write("Button clicked")
-
+if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
-            st.write("Running query:", query)
+            st.write("Running:", query)
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
+                combined = f"{title} {snippet}"
 
-                combined_text = f"{title} {snippet}"
-                scoring = score_result(combined_text)
-
-                result_id = url.strip().lower()
-                now = datetime.now(timezone.utc).isoformat()
+                score, confidence, breakdown = score_text(combined, weights)
 
                 results.append({
-                    "result_id": result_id,
-                    "query_used": query,
-                    "title": title,
-                    "snippet": snippet,
-                    "url": url,
-                    "first_seen": now,
-                    "last_checked": now,
-                    "score": scoring["score"],
-                    "confidence_level": scoring["confidence"],
-                    "matched_keywords": ", ".join(scoring["matched_keywords"]),
-                    "signal_breakdown": " | ".join(scoring["signal_breakdown"])
+                    "Title": title,
+                    "Snippet": snippet,
+                    "URL": url,
+                    "Score": score,
+                    "Confidence": confidence,
+                    "Signals": " | ".join(breakdown)
                 })
-                st.write("Found result:", title)
 
-new_df = pd.DataFrame(results)
-new_df = new_df.reindex(columns=internal_col)
+    df = pd.DataFrame(results)
+    st.dataframe(df, use_container_width=True)
 
-if new_df.empty:
-    st.info("No results found.")
-
-if not existing_df.empty:
-    combined_df = pd.concat([existing_df, new_df])
-    combined_df = combined_df.drop_duplicates(subset="result_id", keep="first")
-else:
-    combined_df = new_df
-
-if not combined_df.empty and len(new_df) > 0:
-    combined_df.columns = [str(c) for c in combined_df.columns]
-    display_df = combined_df.rename(columns=display_col)
-    sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
-    sh = gc.open_by_url(sheet_url)
-    worksheet = sh.worksheet("Sheet1")
-    values = [display_df.columns.values.tolist()] + display_df.values.tolist()
-    worksheet.clear()
-    worksheet.update(values)
-    st.success(f"{len(new_df)} results found. Total results: {len(combined_df)}")
-else:
-    st.warning("Nothing new found.")
-
-if "combined_df" in locals() and not combined_df.empty and "first_seen" in combined_df.columns:
-    st.dataframe(
-        combined_df.sort_values("first_seen", ascending=False),
-        use_container_width=True
-    )
-else:
-    st.info("No data to display yet. Click the 'Run Discovery' button.")
+    if not df.empty:
+        st.bar_chart(df["Score"])
