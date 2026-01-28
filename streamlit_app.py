@@ -11,13 +11,13 @@ st.title("Lead Discovery")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-SCOPES = [
+Scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
 creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
-credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
 gc = gspread.authorize(credentials)
 
 display_col = {
@@ -82,38 +82,59 @@ def score_result(text):
 
     score = 1
     signal_breakdown = []
-    matched_keywords = []
+    found = {
+        "mena": [],
+        "uae": [],
+        "identity": [],
+        "behavior": [],
+        "seniority": []
+    }
 
-    # Hard geographic gate
-    if not any(k in text for k in mena_keywords):
+    for k in mena_keywords:
+        if k in text:
+            found["mena"].append(k)
+
+    if not found["mena"]:
         return {
             "score": 1,
             "confidence": "Low",
-            "matched_keywords": [],
-            "signal_breakdown": ["No MENA relevance"]
+            "matched_keywords": "",
+            "signal_breakdown": "No MENA relevance"
         }
 
     signal_breakdown.append("MENA relevance")
 
-    if any(k in text for k in uae_keywords):
+    for k in uae_keywords:
+        if k in text:
+            found["uae"].append(k)
+
+    if found["uae"]:
         score += 3
         signal_breakdown.append("UAE presence")
-        matched_keywords += uae_keywords
 
-    if any(k in text for k in identity_keywords):
+    for k in identity_keywords:
+        if k in text:
+            found["identity"].append(k)
+
+    if found["identity"]:
         score += 3
         signal_breakdown.append("Investor identity signal")
-        matched_keywords += identity_keywords
 
-    if any(k in text for k in behavior_keywords):
+    for k in behavior_keywords:
+        if k in text:
+            found["behavior"].append(k)
+
+    if found["behavior"]:
         score += 2
         signal_breakdown.append("Investment activity signal")
-        matched_keywords += behavior_keywords
 
-    if any(k in text for k in seniority_keywords):
+    for k in seniority_keywords:
+        if k in text:
+            found["seniority"].append(k)
+
+    if found["seniority"]:
         score += 2
         signal_breakdown.append("Senior role/title")
-        matched_keywords += seniority_keywords
 
     score = min(score, 10)
 
@@ -124,11 +145,16 @@ def score_result(text):
     else:
         confidence = "Low"
 
+    readable_keywords = []
+    for group, keys in found.items():
+        if keys:
+            readable_keywords.append(f"{group.upper()}: {', '.join(keys)}")
+
     return {
         "score": score,
         "confidence": confidence,
-        "matched_keywords": sorted(set([k for k in matched_keywords if k in text])),
-        "signal_breakdown": signal_breakdown
+        "matched_keywords": " | ".join(readable_keywords),
+        "signal_breakdown": " | ".join(signal_breakdown)
     }
 
 queries = [
@@ -175,7 +201,7 @@ if not new_df.empty:
 
     display_df = combined_df.rename(columns=display_col)
 
-    sheet_url = "YOUR_SHEET_URL_HERE"
+    sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
     sh = gc.open_by_url(sheet_url)
     ws = sh.worksheet("Sheet1")
 
