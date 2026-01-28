@@ -194,7 +194,7 @@ if st.button("Run Discovery", key="run_discovery_button"):
                 })
 
                 total_results += 1
-                live_text += f"- **Found result:** {title} | Score: {scoring['score']}\n"
+                live_text += f"- **Found result:** {title}\n"
 
                 placeholder.markdown(live_text)
 
