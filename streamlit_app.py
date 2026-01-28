@@ -155,22 +155,31 @@ queries = [
 
 results = []
 
-if st.button("Run Discovery"):
+if st.button("Run Discovery", key="run_discovery_button"):
+    st.write("Button clicked")
+
+    placeholder = st.empty()
+    results_container = []
+
     with DDGS(timeout=10) as ddgs:
+        total_results = 0
+
         for query in queries:
-            st.write(f"Running query: {query}")
+            placeholder.markdown(f"**Running query:** `{query}`")
+            st.sleep(0.1)
+
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
-                combined_text = f"{title} {snippet}"
 
+                combined_text = f"{title} {snippet}"
                 scoring = score_result(combined_text)
 
+                result_id = url.strip().lower()
                 now = datetime.now(timezone.utc).isoformat()
-                result_id = url.lower().strip()
 
-                results.append({
+                results_container.append({
                     "result_id": result_id,
                     "query_used": query,
                     "title": title,
@@ -184,24 +193,31 @@ if st.button("Run Discovery"):
                     "signal_breakdown": scoring["signal_breakdown"]
                 })
 
-new_df = pd.DataFrame(results).reindex(columns=internal_col)
+                placeholder.markdown(
+                    f"**Found result:** {title} | Score: {scoring['score']} | Confidence: {scoring['confidence']}"
+                )
+                total_results += 1
 
-if not new_df.empty:
-    combined_df = pd.concat([existing_df, new_df])
-    combined_df = combined_df.drop_duplicates(subset="result_id", keep="first")
+    new_df = pd.DataFrame(results_container)
+    new_df = new_df.reindex(columns=internal_col)
 
-    display_df = combined_df.rename(columns=display_col)
+    if not new_df.empty:
+        if not existing_df.empty:
+            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset="result_id", keep="first")
+        else:
+            combined_df = new_df
 
-    sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
-    sh = gc.open_by_url(sheet_url)
-    ws = sh.worksheet("Sheet1")
+        combined_df.columns = [str(c) for c in combined_df.columns]
+        display_df = combined_df.rename(columns=display_col)
 
-    ws.clear()
-    ws.update([display_df.columns.tolist()] + display_df.values.tolist())
+        sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
+        sh = gc.open_by_url(sheet_url)
+        worksheet = sh.worksheet("Sheet1")
+        values = [display_df.columns.values.tolist()] + display_df.values.tolist()
+        worksheet.clear()
+        worksheet.update(values)
 
-    st.success(f"{len(new_df)} new leads added. Total: {len(combined_df)}")
-else:
-    st.info("No new results found.")
-
-if "combined_df" in locals() and not combined_df.empty:
-    st.dataframe(combined_df.sort_values("first_seen", ascending=False), use_container_width=True)
+        st.success(f"{len(new_df)} new leads added. Total: {len(combined_df)}")
+        st.dataframe(combined_df.sort_values("first_seen", ascending=False), use_container_width=True)
+    else:
+        st.warning("Nothing new found.")
