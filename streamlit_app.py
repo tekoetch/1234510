@@ -83,56 +83,46 @@ def score_result(text):
     score = 1
     signal_breakdown = []
     found = {
-        "mena": [],
-        "uae": [],
-        "identity": [],
-        "behavior": [],
-        "seniority": []
+        "MENA": [],
+        "UAE": [],
+        "IDENTITY": [],
+        "BEHAVIOR": [],
+        "SENIORITY": []
     }
 
     for k in mena_keywords:
         if k in text:
-            found["mena"].append(k)
-
-    if not found["mena"]:
-        return {
-            "score": 1,
-            "confidence": "Low",
-            "matched_keywords": "",
-            "signal_breakdown": "No MENA relevance"
-        }
-
-    signal_breakdown.append("MENA relevance")
+            found["MENA"].append(k)
+    if found["MENA"]:
+        signal_breakdown.append("MENA relevance")
+    else:
+        signal_breakdown.append("No MENA relevance")
 
     for k in uae_keywords:
         if k in text:
-            found["uae"].append(k)
-
-    if found["uae"]:
+            found["UAE"].append(k)
+    if found["UAE"]:
         score += 3
         signal_breakdown.append("UAE presence")
 
     for k in identity_keywords:
         if k in text:
-            found["identity"].append(k)
-
-    if found["identity"]:
+            found["IDENTITY"].append(k)
+    if found["IDENTITY"]:
         score += 3
         signal_breakdown.append("Investor identity signal")
 
     for k in behavior_keywords:
         if k in text:
-            found["behavior"].append(k)
-
-    if found["behavior"]:
+            found["BEHAVIOR"].append(k)
+    if found["BEHAVIOR"]:
         score += 2
         signal_breakdown.append("Investment activity signal")
 
     for k in seniority_keywords:
         if k in text:
-            found["seniority"].append(k)
-
-    if found["seniority"]:
+            found["SENIORITY"].append(k)
+    if found["SENIORITY"]:
         score += 2
         signal_breakdown.append("Senior role/title")
 
@@ -148,14 +138,15 @@ def score_result(text):
     readable_keywords = []
     for group, keys in found.items():
         if keys:
-            readable_keywords.append(f"{group.upper()}: {', '.join(keys)}")
+            readable_keywords.append(f"{group}: {', '.join(keys)}")
 
     return {
         "score": score,
         "confidence": confidence,
-        "matched_keywords": "".join(readable_keywords),
-        "signal_breakdown": "".join(signal_breakdown)
+        "matched_keywords": " | ".join(readable_keywords),
+        "signal_breakdown": " | ".join(signal_breakdown)
     }
+
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
