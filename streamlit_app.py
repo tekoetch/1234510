@@ -160,12 +160,13 @@ if st.button("Run Discovery", key="run_discovery_button"):
 
     placeholder = st.empty()
     results_container = []
+    live_text = ""
 
     with DDGS(timeout=10) as ddgs:
         total_results = 0
 
         for query in queries:
-            placeholder.markdown(f"**Running query:** `{query}`")
+            live_text += f"**Running query:** `{query}`\n\n"
 
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
@@ -192,10 +193,11 @@ if st.button("Run Discovery", key="run_discovery_button"):
                     "signal_breakdown": scoring["signal_breakdown"]
                 })
 
-                placeholder.markdown(
-                    f"**Found result:** {title} | Score: {scoring['score']} | Confidence: {scoring['confidence']}"
-                )
                 total_results += 1
+                live_text += f"- **Found result:** {title} | Score: {scoring['score']} | Confidence: {scoring['confidence']}\n"
+
+                placeholder.markdown(live_text)
+
 
     new_df = pd.DataFrame(results_container)
     new_df = new_df.reindex(columns=internal_col)
