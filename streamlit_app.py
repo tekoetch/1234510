@@ -153,8 +153,8 @@ def score_result(text):
     return {
         "score": score,
         "confidence": confidence,
-        "matched_keywords": " | ".join(readable_keywords),
-        "signal_breakdown": " | ".join(signal_breakdown)
+        "matched_keywords": "".join(readable_keywords),
+        "signal_breakdown": "".join(signal_breakdown)
     }
 
 queries = [
