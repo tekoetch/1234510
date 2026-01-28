@@ -12,20 +12,39 @@ freeze_scoring = st.toggle(
     help="When on, scores are not recalculated"
 )
 
-group_a = [
-    "angel investor", "angel investing", "family office",
-    "private investor", "early-stage investor", "venture investor"
+identity_keywords = [
+    "angel investor",
+    "angel investors",
+    "angel investing",
+    "ceo",
+    "founder",
+    "co-founder",
+    "chief investment officer",
+    "head of family office",
+    "investment office"
 ]
 
-group_b = [
-    "investment", "portfolio", "funding", "capital",
-    "seed", "pre-seed"
+behavior_keywords = [
+    "invested in",
+    "startup mentor",
+    "startup builder",
+    "startup",
+    "start up",
+    "startup space",
+    "seed",
+    "seed funding",
+    "seed capital",
+    "pre-seed",
+    "fundraising"
 ]
 
-group_d = [
-    "founder", "chairman", "partner",
-    "principal", "managing director"
+seniority_keywords = [
+    "partner",
+    "founding member",
+    "strategic advisory",
+    "business builder"
 ]
+
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["uae", "dubai", "abu dhabi", "emirates", "middle east", "mena"]
@@ -40,31 +59,32 @@ def score_text(text, query_used, weights):
     mena_in_text = any(k in text for k in mena_keywords)
     mena_in_query = any(k in query_used for k in mena_keywords)
 
-    if mena_in_text or mena_in_query:
-        signal_breakdown.append("MENA presence")
-    else:
+    if not (mena_in_text or mena_in_query):
         return 1, "Low", ["No MENA signal"]
+
+    signal_breakdown.append("MENA presence")
 
     if any(k in text for k in uae_keywords):
         score += weights["uae"]
-        signal_breakdown.append("UAE presence")
+        signal_breakdown.append("UAE context")
 
-    if any(k in text for k in group_a):
-        score += weights["angel"]
-        signal_breakdown.append("Angel / Family Office signal")
-    elif any(k in text for k in group_b):
-        score += weights["investment"]
-        signal_breakdown.append("Investment activity signal")
+    if any(k in text for k in identity_keywords):
+        score += weights["identity"]
+        signal_breakdown.append("Decision-maker identity")
 
-    if any(k in text for k in group_d):
+    elif any(k in text for k in behavior_keywords):
+        score += weights["behavior"]
+        signal_breakdown.append("Investment behavior")
+
+    if any(k in text for k in seniority_keywords):
         score += weights["seniority"]
-        signal_breakdown.append("Senior role/title")
+        signal_breakdown.append("Senior proximity role")
 
     score = min(score, 10)
 
-    if score >= 8:
+    if score >= 7:
         confidence = "High"
-    elif score >= 5:
+    elif score >= 4:
         confidence = "Medium"
     else:
         confidence = "Low"
@@ -74,10 +94,10 @@ def score_text(text, query_used, weights):
 st.sidebar.header("Scoring Playground")
 
 weights = {
-    "uae": st.sidebar.slider("UAE Weight", 0, 8, 6),
-    "angel": st.sidebar.slider("Angel / FO Weight", 0, 5, 3),
-    "investment": st.sidebar.slider("Investment Weight", 0, 5, 2),
-    "seniority": st.sidebar.slider("Seniority Weight", 0, 5, 2),
+    "identity": st.sidebar.slider("Identity (Angel / Founder / CIO)", 0, 5, 3),
+    "behavior": st.sidebar.slider("Investment Behavior", 0, 4, 2),
+    "seniority": st.sidebar.slider("Seniority / Advisory", 0, 3, 1),
+    "uae": st.sidebar.slider("UAE Context Boost", 0, 2, 1),
 }
 
 st.subheader("Manual Scoring Playground")
