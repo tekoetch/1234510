@@ -45,9 +45,11 @@ seniority_keywords = [
     "business builder"
 ]
 
-
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["uae", "dubai", "abu dhabi", "emirates", "middle east", "mena"]
+
+def count_hits(text, keywords):
+    return sum(text.count(k) for k in keywords)
 
 def score_text(text, query_used, weights):
     text = text.lower()
@@ -59,8 +61,9 @@ def score_text(text, query_used, weights):
     mena_in_text = any(k in text for k in mena_keywords)
     mena_in_query = any(k in query_used for k in mena_keywords)
 
-    if not (mena_in_text or mena_in_query):
-        return 1, "Low", ["No MENA signal"]
+    if mena_in_text or mena_in_query:
+        score += weights["mena"]
+        signal_breakdown.append("MENA relevance")
 
     signal_breakdown.append("MENA presence")
 
@@ -68,19 +71,23 @@ def score_text(text, query_used, weights):
         score += weights["uae"]
         signal_breakdown.append("UAE context")
 
-    if any(k in text for k in identity_keywords):
-        score += weights["identity"]
-        signal_breakdown.append("Decision-maker identity")
+    identity_hits = count_hits(text, identity_keywords)
+    behavior_hits = count_hits(text, behavior_keywords)
+    seniority_hits = count_hits(text, seniority_keywords)
 
-    elif any(k in text for k in behavior_keywords):
-        score += weights["behavior"]
-        signal_breakdown.append("Investment behavior")
+    if identity_hits:
+        score += identity_hits * weights["identity"]
+        signal_breakdown.append(f"Identity signals ×{identity_hits}")
 
-    if any(k in text for k in seniority_keywords):
-        score += weights["seniority"]
-        signal_breakdown.append("Senior proximity role")
+    if behavior_hits:
+        score += behavior_hits * weights["behavior"]
+        signal_breakdown.append(f"Behavior signals ×{behavior_hits}")
 
-    score = min(score, 10)
+    if seniority_hits:
+        score += seniority_hits * weights["seniority"]
+        signal_breakdown.append(f"Seniority signals ×{seniority_hits}")
+
+    score = round(min(score, 10))
 
     if score >= 7:
         confidence = "High"
@@ -94,11 +101,13 @@ def score_text(text, query_used, weights):
 st.sidebar.header("Scoring Playground")
 
 weights = {
-    "identity": st.sidebar.slider("Identity (Angel / Founder / CIO)", 0, 5, 3),
-    "behavior": st.sidebar.slider("Investment Behavior", 0, 4, 2),
-    "seniority": st.sidebar.slider("Seniority / Advisory", 0, 3, 1),
-    "uae": st.sidebar.slider("UAE Context Boost", 0, 2, 1),
+    "identity": st.sidebar.slider("Identity (Angel / Founder / CIO)", 0.0, 3.0, 1.5, 0.1),
+    "behavior": st.sidebar.slider("Investment Behavior (per hit)", 0.0, 1.0, 0.3, 0.1),
+    "seniority": st.sidebar.slider("Seniority / Advisory", 0.0, 1.5, 0.5, 0.1),
+    "uae": st.sidebar.slider("UAE Context Boost", 0.0, 1.5, 0.7, 0.1),
+    "mena": st.sidebar.slider("MENA Boost", 0.0, 1.0, 0.4, 0.1),
 }
+
 
 st.subheader("Manual Scoring Playground")
 
@@ -135,7 +144,7 @@ if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
             st.write("Running query:", query)
-            
+
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
