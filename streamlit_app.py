@@ -135,7 +135,7 @@ if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
             st.write("Running query:", query)
-
+            
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
