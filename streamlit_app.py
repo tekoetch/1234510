@@ -166,7 +166,6 @@ if st.button("Run Discovery", key="run_discovery_button"):
 
         for query in queries:
             placeholder.markdown(f"**Running query:** `{query}`")
-            st.sleep(0.1)
 
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
