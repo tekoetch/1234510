@@ -180,8 +180,8 @@ if st.button("Run Discovery"):
                     "last_checked": now,
                     "score": scoring["score"],
                     "confidence_level": scoring["confidence"],
-                    "matched_keywords": ", ".join(scoring["matched_keywords"]),
-                    "signal_breakdown": " | ".join(scoring["signal_breakdown"])
+                    "matched_keywords": scoring["matched_keywords"],
+                    "signal_breakdown": scoring["signal_breakdown"]
                 })
 
 new_df = pd.DataFrame(results).reindex(columns=internal_col)
