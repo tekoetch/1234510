@@ -2,97 +2,91 @@ import streamlit as st
 from ddgs import DDGS
 import pandas as pd
 
-st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
+st.set_page_config(page_title="Leads Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
 
-freeze_scoring = st.toggle(
-    "Freeze scoring (manual review mode)",
-    value=False,
-    help="When on, scores are not recalculated"
-)
+st.sidebar.header("Scoring Weights (Playground)")
+
+weights = {
+    "base": st.sidebar.slider("Base score", 0.0, 3.0, 1.0, 0.1),
+
+    "geo_query": st.sidebar.slider("Geography in QUERY (small boost)", 0.0, 1.0, 0.3, 0.1),
+    "geo_text": st.sidebar.slider("Geography in TEXT (capped)", 0.0, 2.0, 1.0, 0.1),
+
+    "identity_first": st.sidebar.slider("Identity (first hit)", 0.0, 3.0, 2.0, 0.1),
+    "identity_repeat": st.sidebar.slider("Identity (repeat hit)", 0.0, 1.0, 0.3, 0.1),
+
+    "behavior_per": st.sidebar.slider("Behavior (per hit)", 0.0, 1.0, 0.3, 0.1),
+
+    "seniority_first": st.sidebar.slider("Seniority (first hit)", 0.0, 2.0, 1.5, 0.1),
+    "seniority_repeat": st.sidebar.slider("Seniority (repeat hit)", 0.0, 1.0, 0.2, 0.1),
+}
+
+freeze_scoring = st.toggle("Freeze scoring", value=False)
 
 identity_keywords = [
-    "angel investor",
-    "angel investing",
-    "family office",
-    "venture partner",
-    "chief investment officer",
-    "cio",
-    "founder",
-    "co-founder",
-    "ceo"
+    "angel investor", "angel investing", "family office",
+    "venture partner", "cio", "chief investment officer",
+    "founder", "co-founder", "ceo"
 ]
 
 behavior_keywords = [
-    "invested in",
-    "investing in",
-    "portfolio",
-    "seed",
-    "pre-seed",
-    "early-stage",
-    "funding",
-    "fundraising"
+    "invested in", "investing in", "portfolio",
+    "seed", "pre-seed", "early-stage", "funding"
 ]
 
 seniority_keywords = [
-    "partner",
-    "managing director",
-    "chairman",
-    "board member",
-    "advisor",
-    "advisory"
+    "partner", "managing director", "chairman",
+    "board member", "advisor", "advisory"
 ]
 
-uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
-mena_keywords = ["middle east", "mena"]
+geo_keywords = ["uae", "dubai", "abu dhabi", "emirates", "mena", "middle east"]
 
-def score_text(text, query):
+def score_text(text, query, w):
     text = text.lower()
     query = query.lower()
 
-    score = 1.0
-    signal_groups_fired = set()
+    score = w["base"]
+    signal_groups = set()
     breakdown = []
 
     geo_hit = False
 
-    if any(k in query for k in uae_keywords + mena_keywords):
-        score += 0.3
-        geo_hit = True
-        breakdown.append("Query mentions MENA/UAE")
+    if any(k in query for k in geo_keywords):
+        score += w["geo_query"]
+        breakdown.append("Geography found in query")
 
-    if any(k in text for k in uae_keywords + mena_keywords):
-        score += 0.7
+    if any(k in text for k in geo_keywords):
+        score += w["geo_text"]
         geo_hit = True
-        breakdown.append("Text mentions MENA/UAE")
+        breakdown.append("Geography found in text")
 
     if geo_hit:
-        signal_groups_fired.add("Geography")
+        signal_groups.add("Geography")
 
     identity_hits = [k for k in identity_keywords if k in text]
     if identity_hits:
-        score += 2.0
-        score += max(0, len(identity_hits) - 1) * 0.3
-        signal_groups_fired.add("Identity")
-        breakdown.append(f"Identity keywords: {', '.join(identity_hits)}")
+        score += w["identity_first"]
+        score += max(0, len(identity_hits) - 1) * w["identity_repeat"]
+        signal_groups.add("Identity")
+        breakdown.append(f"Identity hits: {identity_hits}")
 
     behavior_hits = [k for k in behavior_keywords if k in text]
     if behavior_hits:
-        score += len(behavior_hits) * 0.3
-        signal_groups_fired.add("Behavior")
-        breakdown.append(f"Behavior keywords: {', '.join(behavior_hits)}")
+        score += len(behavior_hits) * w["behavior_per"]
+        signal_groups.add("Behavior")
+        breakdown.append(f"Behavior hits: {behavior_hits}")
 
     seniority_hits = [k for k in seniority_keywords if k in text]
     if seniority_hits:
-        score += 1.5
-        score += max(0, len(seniority_hits) - 1) * 0.2
-        signal_groups_fired.add("Seniority")
-        breakdown.append(f"Seniority keywords: {', '.join(seniority_hits)}")
+        score += w["seniority_first"]
+        score += max(0, len(seniority_hits) - 1) * w["seniority_repeat"]
+        signal_groups.add("Seniority")
+        breakdown.append(f"Seniority hits: {seniority_hits}")
 
-    score = round(min(score, 10), 1)
+    score = min(score, 10)
 
-    group_count = len(signal_groups_fired)
-
+    group_count = len(signal_groups)
     if group_count >= 3:
         confidence = "High"
     elif group_count == 2:
@@ -116,52 +110,11 @@ if sample_text:
     if freeze_scoring:
         score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
     else:
-        score, confidence, breakdown = score_text(sample_text, "")
+        score, confidence, breakdown = score_text(sample_text, "", weights)
 
-    st.metric("Score", score)
+    st.metric("Score (1–10)", score)
     st.metric("Confidence", confidence)
 
     with st.expander("Why this scored what it scored"):
         for b in breakdown:
             st.markdown(f"- {b}")
-
-queries = [
-    '"angel investor" UAE site:linkedin.com/in'
-]    
-
-st.subheader("Live Discovery")
-
-results = []
-
-if st.button("Run Discovery"):
-    with DDGS(timeout=10) as ddgs:
-        for query in queries:
-            st.write(f"Running query: {query}")
-
-            for r in ddgs.text(query, max_results=5, backend="html"):
-                title = r.get("title", "")
-                snippet = r.get("body", "")
-                url = r.get("href", "")
-
-                combined_text = f"{title} {snippet}"
-
-                if freeze_scoring:
-                    score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
-                else:
-                    score, confidence, breakdown = score_text(combined_text, query)
-
-                results.append({
-                    "Title": title,
-                    "Snippet": snippet,
-                    "URL": url,
-                    "Score": score,
-                    "Confidence": confidence,
-                    "Signals": " | ".join(breakdown)
-                })
-
-    df = pd.DataFrame(results)
-    st.dataframe(df, use_container_width=True)
-
-    if not df.empty:
-        st.subheader("Score Distribution")
-        st.bar_chart(df["Score"].value_counts().sort_index())
