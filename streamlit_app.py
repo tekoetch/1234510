@@ -9,18 +9,18 @@ freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 
 st.sidebar.header("Scoring Controls")
 
-BASE_SCORE = st.sidebar.slider("Base score", 0.0, 3.0, 1.5, 0.1)
+BASE_SCORE = st.sidebar.slider("Base score (query baseline)", 0.0, 3.0, 1.5, 0.1)
 
-IDENTITY_WEIGHT = st.sidebar.slider("Identity keyword weight", 0.2, 3.0, 1.2, 0.1)
-BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword weight", 0.1, 2.0, 0.4, 0.1)
-SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword weight", 0.2, 3.0, 1.0, 0.1)
+IDENTITY_WEIGHT = st.sidebar.slider("Primary identity boost", 0.5, 3.0, 1.8, 0.1)
+IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Additional identity boost", 0.2, 1.5, 0.8, 0.1)
 
-IDENTITY_GROUP_BONUS = st.sidebar.slider("Identity group bonus", 0.0, 2.0, 0.8, 0.1)
-BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Behavior group bonus", 0.0, 2.0, 0.6, 0.1)
+BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword boost", 0.1, 2.0, 0.4, 0.1)
+BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.5, 0.6, 0.1)
+
+SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword boost", 0.2, 3.0, 1.0, 0.1)
 SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 2.0, 0.7, 0.1)
-GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 2.0, 0.9, 0.1)
-IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Identity diminishing boost", 0.2, 1.5, 0.6, 0.1)
 
+GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 2.0, 0.9, 0.1)
 
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -46,29 +46,23 @@ def score_text(text, query):
     query = query.lower()
 
     score = BASE_SCORE
-    breakdown = []
-    breakdown.append(f"Base score from query (+{BASE_SCORE})")
+    breakdown = [f"Base score from query (+{BASE_SCORE})"]
     signal_groups = set()
 
-    uae_hit_text = any(k in text for k in uae_keywords)
-    mena_hit_text = any(k in text for k in mena_keywords)
-    uae_hit_query = any(k in query for k in uae_keywords)
-    mena_hit_query = any(k in query for k in mena_keywords)
-
-    if uae_hit_query:
+    if any(k in query for k in uae_keywords):
         score += 0.3
         breakdown.append("UAE mentioned in query (+0.3)")
 
-    if mena_hit_query:
+    if any(k in query for k in mena_keywords):
         score += 0.2
         breakdown.append("MENA mentioned in query (+0.2)")
 
-    if uae_hit_text:
+    if any(k in text for k in uae_keywords):
         score += 1.2
         signal_groups.add("Geography")
         breakdown.append("UAE mentioned in text (+1.2)")
 
-    elif mena_hit_text:
+    elif any(k in text for k in mena_keywords):
         score += 0.6
         signal_groups.add("Geography")
         breakdown.append("MENA mentioned in text (+0.6)")
@@ -76,9 +70,8 @@ def score_text(text, query):
     identity_hits = [k for k in identity_keywords if k in text]
 
     if identity_hits:
-        first_hit = identity_hits[0]
         score += IDENTITY_WEIGHT
-        breakdown.append(f"Primary identity '{first_hit}' (+{IDENTITY_WEIGHT})")
+        breakdown.append(f"Primary identity '{identity_hits[0]}' (+{IDENTITY_WEIGHT})")
 
         for k in identity_hits[1:]:
             score += IDENTITY_DIMINISHING_WEIGHT
@@ -88,18 +81,19 @@ def score_text(text, query):
 
         signal_groups.add("Identity")
 
-
     behavior_hits = [k for k in behavior_keywords if k in text]
+
     for k in behavior_hits:
         score += BEHAVIOR_WEIGHT
         breakdown.append(f"Behavior keyword '{k}' (+{BEHAVIOR_WEIGHT})")
 
-    if behavior_hits:
+    if behavior_hits and "Identity" in signal_groups:
         score += BEHAVIOR_GROUP_BONUS
+        breakdown.append(f"Identity + behavior synergy (+{BEHAVIOR_GROUP_BONUS})")
         signal_groups.add("Behavior")
-        breakdown.append(f"Behavior group bonus (+{BEHAVIOR_GROUP_BONUS})")
 
     seniority_hits = [k for k in seniority_keywords if k in text]
+
     for k in seniority_hits:
         score += SENIORITY_WEIGHT
         breakdown.append(f"Seniority keyword '{k}' (+{SENIORITY_WEIGHT})")
@@ -116,7 +110,11 @@ def score_text(text, query):
     score = min(score, 10.0)
 
     group_count = len(signal_groups)
-    confidence = "High" if group_count >= 3 else "Medium" if group_count == 2 else "Low"
+    confidence = (
+        "High" if group_count >= 3
+        else "Medium" if group_count == 2
+        else "Low"
+    )
 
     breakdown.insert(0, f"Signal groups fired: {group_count}")
 
