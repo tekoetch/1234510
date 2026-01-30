@@ -1,224 +1,177 @@
 import streamlit as st
 from ddgs import DDGS
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime, timezone
-import gspread
-from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Lead Discovery", layout="wide")
-st.title("Lead Discovery")
+st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
+st.title("Leads Discovery + Scoring Playground")
 
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-Scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
-credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-gc = gspread.authorize(credentials)
-
-display_col = {
-    "result_id": "Result ID",
-    "query_used": "Query Used",
-    "title": "Title",
-    "snippet": "Snippet",
-    "url": "URL",
-    "first_seen": "First Seen",
-    "last_checked": "Last Checked",
-    "score": "Score",
-    "confidence_level": "Confidence",
-    "matched_keywords": "Matched Keywords",
-    "signal_breakdown": "Why It Scored This Way",
-}
-
-internal_col = list(display_col.keys())
-
-try:
-    existing_df = conn.read(worksheet="Sheet1")
-    existing_df.columns = (
-        existing_df.columns
-        .str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-    )
-    existing_df = existing_df.reindex(columns=internal_col)
-except Exception:
-    existing_df = pd.DataFrame(columns=internal_col)
+freeze_scoring = st.toggle(
+    "Freeze scoring (manual review mode)",
+    value=False,
+    help="When on, scores are not recalculated"
+)
 
 identity_keywords = [
     "angel investor",
+    "angel investors",
     "angel investing",
-    "family office",
-    "venture investor",
-    "private investor"
+    "ceo",
+    "founder",
+    "co-founder",
+    "chief investment officer",
+    "head of family office",
+    "investment office"
 ]
 
 behavior_keywords = [
     "invested in",
-    "portfolio",
-    "funding",
+    "startup mentor",
+    "startup builder",
+    "startup",
+    "start up",
+    "startup space",
     "seed",
+    "seed funding",
+    "seed capital",
     "pre-seed",
-    "early-stage"
+    "fundraising"
 ]
 
 seniority_keywords = [
-    "founder",
-    "co-founder",
     "partner",
-    "chairman",
-    "managing director",
-    "principal"
+    "founding member",
+    "strategic advisory",
+    "business builder"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["uae", "dubai", "abu dhabi", "emirates", "middle east", "mena"]
 
-def score_result(text):
+def count_hits(text, keywords):
+    return sum(text.count(k) for k in keywords)
+
+def score_text(text, query_used, weights):
     text = text.lower()
+    query_used = query_used.lower()
 
     score = 1
     signal_breakdown = []
-    found = {
-        "MENA": [],
-        "UAE": [],
-        "IDENTITY": [],
-        "BEHAVIOR": [],
-        "SENIORITY": []
-    }
 
-    for k in mena_keywords:
-        if k in text:
-            found["MENA"].append(k)
-    if found["MENA"]:
+    mena_in_text = any(k in text for k in mena_keywords)
+    mena_in_query = any(k in query_used for k in mena_keywords)
+
+    if mena_in_text or mena_in_query:
+        score += weights["mena"]
         signal_breakdown.append("MENA relevance")
-    else:
-        signal_breakdown.append("No MENA relevance")
 
-    for k in uae_keywords:
-        if k in text:
-            found["UAE"].append(k)
-    if found["UAE"]:
-        score += 3
-        signal_breakdown.append("UAE presence")
+    signal_breakdown.append("MENA presence")
 
-    for k in identity_keywords:
-        if k in text:
-            found["IDENTITY"].append(k)
-    if found["IDENTITY"]:
-        score += 3
-        signal_breakdown.append("Investor identity signal")
+    if any(k in text for k in uae_keywords):
+        score += weights["uae"]
+        signal_breakdown.append("UAE context")
 
-    for k in behavior_keywords:
-        if k in text:
-            found["BEHAVIOR"].append(k)
-    if found["BEHAVIOR"]:
-        score += 2
-        signal_breakdown.append("Investment activity signal")
+    identity_hits = count_hits(text, identity_keywords)
+    behavior_hits = count_hits(text, behavior_keywords)
+    seniority_hits = count_hits(text, seniority_keywords)
 
-    for k in seniority_keywords:
-        if k in text:
-            found["SENIORITY"].append(k)
-    if found["SENIORITY"]:
-        score += 2
-        signal_breakdown.append("Senior role/title")
+    if identity_hits:
+        score += identity_hits * weights["identity"]
+        signal_breakdown.append(f"Identity signals ×{identity_hits}")
 
-    score = min(score, 10)
+    if behavior_hits:
+        score += behavior_hits * weights["behavior"]
+        signal_breakdown.append(f"Behavior signals ×{behavior_hits}")
 
-    if score >= 8:
+    if seniority_hits:
+        score += seniority_hits * weights["seniority"]
+        signal_breakdown.append(f"Seniority signals ×{seniority_hits}")
+
+    score = round(min(score, 10))
+
+    if score >= 7:
         confidence = "High"
-    elif score >= 5:
+    elif score >= 4:
         confidence = "Medium"
     else:
         confidence = "Low"
 
-    readable_keywords = []
-    for group, keys in found.items():
-        if keys:
-            readable_keywords.append(f"{group}: {', '.join(keys)}")
+    return score, confidence, signal_breakdown
 
-    return {
-        "score": score,
-        "confidence": confidence,
-        "matched_keywords": " | ".join(readable_keywords),
-        "signal_breakdown": " | ".join(signal_breakdown)
-    }
+st.sidebar.header("Scoring Playground")
 
+weights = {
+    "identity": st.sidebar.slider("Identity (Angel / Founder / CIO)", 0.0, 3.0, 1.5, 0.1),
+    "behavior": st.sidebar.slider("Investment Behavior (per hit)", 0.0, 1.0, 0.3, 0.1),
+    "seniority": st.sidebar.slider("Seniority / Advisory", 0.0, 1.5, 0.5, 0.1),
+    "uae": st.sidebar.slider("UAE Context Boost", 0.0, 1.5, 0.7, 0.1),
+    "mena": st.sidebar.slider("MENA Boost", 0.0, 1.0, 0.4, 0.1),
+}
+
+
+st.subheader("Manual Scoring Playground")
+
+sample_text = st.text_area(
+    "Paste a real LinkedIn title + snippet here",
+    height=150,
+    placeholder="Angel Investor | Based in Dubai | Early-stage FinTech & SaaS"
+)
+
+if sample_text:
+    if freeze_scoring:
+        st.warning("Scoring is frozen")
+        score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
+    else:
+        score, confidence, breakdown = score_text(sample_text, "", weights)
+
+    st.metric("Score", score)
+    st.metric("Confidence", confidence)
+
+    with st.expander("Why this scored what it scored"):
+        for s in breakdown:
+            st.markdown(f"- Good {s}")
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
-    '"family office" Dubai site:linkedin.com/in'
+    '"family office" Dubai site:linkedin.com/in',
 ]
+
+st.subheader("Live Discovery")
 
 results = []
 
-if st.button("Run Discovery", key="run_discovery_button"):
-    st.write("Button clicked")
-
-    placeholder = st.empty()
-    results_container = []
-    live_text = ""
-
+if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
-        total_results = 0
-
         for query in queries:
-            live_text += f"**Running query:** `{query}`\n\n"
+            st.write("Running query:", query)
 
             for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
-
                 combined_text = f"{title} {snippet}"
-                scoring = score_result(combined_text)
 
-                result_id = url.strip().lower()
-                now = datetime.now(timezone.utc).isoformat()
+                if freeze_scoring:
+                    score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
+                else:
+                    score, confidence, breakdown = score_text(
+                        combined_text,
+                        query,
+                        weights
+                    )
 
-                results_container.append({
-                    "result_id": result_id,
-                    "query_used": query,
-                    "title": title,
-                    "snippet": snippet,
-                    "url": url,
-                    "first_seen": now,
-                    "last_checked": now,
-                    "score": scoring["score"],
-                    "confidence_level": scoring["confidence"],
-                    "matched_keywords": scoring["matched_keywords"],
-                    "signal_breakdown": scoring["signal_breakdown"]
+                results.append({
+                    "Title": title,
+                    "Snippet": snippet,
+                    "URL": url,
+                    "Score": score,
+                    "Confidence": confidence,
+                    "Signals": " | ".join(breakdown)
                 })
 
-                total_results += 1
-                live_text += f"- **Found result:** {title}\n"
+    df = pd.DataFrame(results)
+    st.dataframe(df, use_container_width=True)
 
-                placeholder.markdown(live_text)
-
-
-    new_df = pd.DataFrame(results_container)
-    new_df = new_df.reindex(columns=internal_col)
-
-    if not new_df.empty:
-        if not existing_df.empty:
-            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset="result_id", keep="first")
-        else:
-            combined_df = new_df
-
-        combined_df.columns = [str(c) for c in combined_df.columns]
-        display_df = combined_df.rename(columns=display_col)
-
-        sheet_url = "https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0"
-        sh = gc.open_by_url(sheet_url)
-        worksheet = sh.worksheet("Sheet1")
-        values = [display_df.columns.values.tolist()] + display_df.values.tolist()
-        worksheet.clear()
-        worksheet.update(values)
-
-        st.success(f"{len(new_df)} new leads added. Total: {len(combined_df)}")
-        st.dataframe(combined_df.sort_values("first_seen", ascending=False), use_container_width=True)
-    else:
-        st.warning("Nothing new found.")
+    if not df.empty:
+        st.subheader("Score Distribution")
+        st.bar_chart(df["Score"].value_counts().sort_index())
