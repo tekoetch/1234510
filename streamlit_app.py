@@ -28,8 +28,7 @@ identity_keywords = [
 
 behavior_keywords = [
     "invested in", "investing in", "portfolio",
-    "seed", "pre-seed", "early-stage", "funding", "fundraising",
-    "gulf"
+    "seed", "pre-seed", "early-stage", "funding", "fundraising"
 ]
 
 seniority_keywords = [
@@ -38,7 +37,7 @@ seniority_keywords = [
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
-mena_keywords = ["mena", "middle east"]
+mena_keywords = ["mena", "middle east", "gulf"]
 
 def score_text(text, query):
     text = text.lower()
