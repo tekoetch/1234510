@@ -19,6 +19,8 @@ IDENTITY_GROUP_BONUS = st.sidebar.slider("Identity group bonus", 0.0, 2.0, 0.8, 
 BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Behavior group bonus", 0.0, 2.0, 0.6, 0.1)
 SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 2.0, 0.7, 0.1)
 GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 2.0, 0.9, 0.1)
+IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Identity diminishing boost", 0.2, 1.5, 0.6, 0.1)
+
 
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -45,6 +47,7 @@ def score_text(text, query):
 
     score = BASE_SCORE
     breakdown = []
+    breakdown.append(f"Base score from query (+{BASE_SCORE})")
     signal_groups = set()
 
     uae_hit_text = any(k in text for k in uae_keywords)
@@ -71,14 +74,20 @@ def score_text(text, query):
         breakdown.append("MENA mentioned in text (+0.6)")
 
     identity_hits = [k for k in identity_keywords if k in text]
-    for k in identity_hits:
-        score += IDENTITY_WEIGHT
-        breakdown.append(f"Identity keyword '{k}' (+{IDENTITY_WEIGHT})")
 
     if identity_hits:
-        score += IDENTITY_GROUP_BONUS
+        first_hit = identity_hits[0]
+        score += IDENTITY_WEIGHT
+        breakdown.append(f"Primary identity '{first_hit}' (+{IDENTITY_WEIGHT})")
+
+        for k in identity_hits[1:]:
+            score += IDENTITY_DIMINISHING_WEIGHT
+            breakdown.append(
+                f"Additional identity '{k}' (+{IDENTITY_DIMINISHING_WEIGHT})"
+            )
+
         signal_groups.add("Identity")
-        breakdown.append(f"Identity group bonus (+{IDENTITY_GROUP_BONUS})")
+
 
     behavior_hits = [k for k in behavior_keywords if k in text]
     for k in behavior_hits:
