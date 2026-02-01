@@ -11,8 +11,6 @@ if "results" not in st.session_state:
 st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
 
-conn = st.connection("gsheets", type=GSheetsConnection)
-
 Scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
