@@ -1,9 +1,27 @@
 import streamlit as st
 from ddgs import DDGS
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
+import os
+
+if "results" not in st.session_state:
+    st.session_state.results = []
 
 st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
+
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+Scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
+credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
+
+gc = gspread.authorize(credentials)
 
 freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 
@@ -143,12 +161,10 @@ if sample_text:
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
-    '"family office" Dubai site:linkedin.com/in'
+    'angel investor "UAE" site:linkedin.com/in'
 ]
 
 st.subheader("Live Discovery")
-
-results = []
 
 if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
@@ -158,6 +174,20 @@ if st.button("Run Discovery"):
                 snippet = r.get("body", "")
                 url = r.get("href", "")
 
+                if not url:
+                    continue
+
+                url_key = url.split("?")[0].lower()
+
+                # dedupe check
+                existing_urls = {
+                    row["URL"].split("?")[0].lower()
+                    for row in st.session_state.results
+                }
+
+                if url_key in existing_urls:
+                    continue
+
                 combined_text = f"{title} {snippet}"
 
                 if freeze_scoring:
@@ -165,7 +195,7 @@ if st.button("Run Discovery"):
                 else:
                     score, confidence, breakdown = score_text(combined_text, query)
 
-                results.append({
+                st.session_state.results.append({
                     "Title": title,
                     "Snippet": snippet,
                     "URL": url,
@@ -174,7 +204,9 @@ if st.button("Run Discovery"):
                     "Signals": " | ".join(breakdown)
                 })
 
-    df = pd.DataFrame(results)
+
+
+    df = pd.DataFrame(st.session_state.results)
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
