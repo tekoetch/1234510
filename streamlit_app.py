@@ -15,12 +15,12 @@ IDENTITY_WEIGHT = st.sidebar.slider("Primary identity boost", 0.5, 3.0, 1.8, 0.1
 IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Additional identity boost", 0.2, 1.5, 0.8, 0.1)
 
 BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword boost", 0.1, 2.0, 0.4, 0.1)
-BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.5, 0.6, 0.1)
+BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.0, 0.5, 0.1)
 
 SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword boost", 0.2, 3.0, 1.0, 0.1)
-SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 2.0, 0.7, 0.1)
+SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 1.0, 0.5, 0.1)
 
-GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 2.0, 0.9, 0.1)
+GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 1.0, 0.5, 0.1)
 
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -58,9 +58,9 @@ def score_text(text, query):
         breakdown.append("MENA mentioned in query (+0.2)")
 
     if any(k in text for k in uae_keywords):
-        score += 1.2
+        score += 1.0
         signal_groups.add("Geography")
-        breakdown.append("UAE mentioned in text (+1.2)")
+        breakdown.append("UAE mentioned in text (+1.0)")
 
     elif any(k in text for k in mena_keywords):
         score += 0.6
