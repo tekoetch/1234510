@@ -175,7 +175,7 @@ if st.button("Run Discovery"):
     df = pd.DataFrame(st.session_state.results)
     st.dataframe(df, use_container_width=True)
 
-    sh = gc.open_by_url("YOUR_SHEET_URL_HERE")
+    sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0")
     ws = sh.sheet1
 
     existing = ws.get_all_records()
