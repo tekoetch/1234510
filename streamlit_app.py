@@ -3,7 +3,6 @@ from ddgs import DDGS
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-import os
 
 if "results" not in st.session_state:
     st.session_state.results = []
@@ -18,7 +17,6 @@ Scopes = [
 
 creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
 credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-
 gc = gspread.authorize(credentials)
 
 freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
@@ -26,16 +24,12 @@ freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 st.sidebar.header("Scoring Controls")
 
 BASE_SCORE = st.sidebar.slider("Base score (query baseline)", 0.0, 3.0, 1.5, 0.1)
-
 IDENTITY_WEIGHT = st.sidebar.slider("Primary identity boost", 0.5, 3.0, 1.8, 0.1)
 IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Additional identity boost", 0.2, 1.5, 0.8, 0.1)
-
 BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword boost", 0.1, 2.0, 0.4, 0.1)
 BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.0, 0.5, 0.1)
-
 SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword boost", 0.2, 3.0, 1.0, 0.1)
 SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 1.0, 0.5, 0.1)
-
 GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 1.0, 0.5, 0.1)
 
 identity_keywords = [
@@ -57,7 +51,19 @@ seniority_keywords = [
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf"]
 
-def score_text(text, query):
+def url_origin_bonus(url):
+    if not url:
+        return 0.0
+    u = url.lower()
+    if u.startswith("https://ae.linkedin.com"):
+        return 0.3
+    if u.startswith("https://qa.linkedin.com"):
+        return 0.1
+    if u.startswith("https://in.linkedin.com"):
+        return 0.1
+    return 0.0
+
+def score_text(text, query, url):
     text = text.lower()
     query = query.lower()
 
@@ -77,28 +83,27 @@ def score_text(text, query):
         score += 1.0
         signal_groups.add("Geography")
         breakdown.append("UAE mentioned in text (+1.0)")
-
     elif any(k in text for k in mena_keywords):
         score += 0.6
         signal_groups.add("Geography")
         breakdown.append("MENA mentioned in text (+0.6)")
 
-    identity_hits = [k for k in identity_keywords if k in text]
+    origin_bonus = url_origin_bonus(url)
+    if origin_bonus > 0:
+        score += origin_bonus
+        breakdown.append(f"URL origin bonus (+{origin_bonus})")
+        signal_groups.add("Geography")
 
+    identity_hits = [k for k in identity_keywords if k in text]
     if identity_hits:
         score += IDENTITY_WEIGHT
         breakdown.append(f"Primary identity '{identity_hits[0]}' (+{IDENTITY_WEIGHT})")
-
         for k in identity_hits[1:]:
             score += IDENTITY_DIMINISHING_WEIGHT
-            breakdown.append(
-                f"Additional identity '{k}' (+{IDENTITY_DIMINISHING_WEIGHT})"
-            )
-
+            breakdown.append(f"Additional identity '{k}' (+{IDENTITY_DIMINISHING_WEIGHT})")
         signal_groups.add("Identity")
 
     behavior_hits = [k for k in behavior_keywords if k in text]
-
     for k in behavior_hits:
         score += BEHAVIOR_WEIGHT
         breakdown.append(f"Behavior keyword '{k}' (+{BEHAVIOR_WEIGHT})")
@@ -109,53 +114,24 @@ def score_text(text, query):
         signal_groups.add("Behavior")
 
     seniority_hits = [k for k in seniority_keywords if k in text]
-
     for k in seniority_hits:
         score += SENIORITY_WEIGHT
         breakdown.append(f"Seniority keyword '{k}' (+{SENIORITY_WEIGHT})")
 
     if seniority_hits:
         score += SENIORITY_GROUP_BONUS
-        signal_groups.add("Seniority")
         breakdown.append(f"Seniority group bonus (+{SENIORITY_GROUP_BONUS})")
+        signal_groups.add("Seniority")
 
     if "Geography" in signal_groups:
         score += GEO_GROUP_BONUS
         breakdown.append(f"Geography group bonus (+{GEO_GROUP_BONUS})")
 
     score = min(score, 10.0)
-
     group_count = len(signal_groups)
-    confidence = (
-        "High" if group_count >= 3
-        else "Medium" if group_count == 2
-        else "Low"
-    )
-
+    confidence = "High" if group_count >= 3 else "Medium" if group_count == 2 else "Low"
     breakdown.insert(0, f"Signal groups fired: {group_count}")
-
     return score, confidence, breakdown
-
-st.subheader("Manual Scoring Playground")
-
-sample_text = st.text_area(
-    "Paste LinkedIn title + snippet",
-    height=150,
-    placeholder="Angel Investor | Based in Dubai | Investing in early-stage startups"
-)
-
-if sample_text:
-    if freeze_scoring:
-        score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
-    else:
-        score, confidence, breakdown = score_text(sample_text, "")
-
-    st.metric("Score (1–10)", score)
-    st.metric("Confidence", confidence)
-
-    with st.expander("Why this scored what it scored"):
-        for b in breakdown:
-            st.write(b)
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
@@ -176,13 +152,7 @@ if st.button("Run Discovery"):
                     continue
 
                 url_key = url.split("?")[0].lower()
-
-                # dedupe check
-                existing_urls = {
-                    row["URL"].split("?")[0].lower()
-                    for row in st.session_state.results
-                }
-
+                existing_urls = {row["URL"].split("?")[0].lower() for row in st.session_state.results}
                 if url_key in existing_urls:
                     continue
 
@@ -191,7 +161,7 @@ if st.button("Run Discovery"):
                 if freeze_scoring:
                     score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
                 else:
-                    score, confidence, breakdown = score_text(combined_text, query)
+                    score, confidence, breakdown = score_text(combined_text, query, url)
 
                 st.session_state.results.append({
                     "Title": title,
@@ -202,11 +172,21 @@ if st.button("Run Discovery"):
                     "Signals": " | ".join(breakdown)
                 })
 
-
-
     df = pd.DataFrame(st.session_state.results)
     st.dataframe(df, use_container_width=True)
 
-    if not df.empty:
-        st.subheader("Score Distribution")
-        st.bar_chart(df["Score"].round(1).value_counts().sort_index())
+    sh = gc.open_by_url("YOUR_SHEET_URL_HERE")
+    ws = sh.sheet1
+
+    existing = ws.get_all_records()
+    existing_urls = {r["URL"].split("?")[0].lower() for r in existing}
+
+    new_rows = []
+    for _, row in df.iterrows():
+        if row["URL"].split("?")[0].lower() not in existing_urls:
+            new_rows.append(row.tolist())
+
+    if new_rows:
+        ws.append_rows(new_rows, value_input_option="RAW")
+
+    st.success(f"Total leads stored: {len(existing) + len(new_rows)}")
