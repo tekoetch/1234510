@@ -52,33 +52,6 @@ seniority_keywords = [
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf"]
 
-ALLOWED_GEO_KEYWORDS = [
-    "uae", "united arab emirates", "dubai", "abu dhabi",
-    "mena", "middle east", "gulf"
-]
-
-BLOCKED_GEO_KEYWORDS = [
-    "united states", "usa", "us",
-    "india", "ahmedabad",
-    "canada", "uk", "united kingdom",
-    "australia", "singapore",
-    "germany", "france"
-]
-
-def extract_location_field(text):
-    match = re.search(r"location:\s*([^\n·|]+)", text, re.IGNORECASE)
-    if match:
-        return match.group(1).strip().lower()
-    return None
-
-def is_hard_geo_reject(text):
-    location = extract_location_field(text)
-    if not location:
-        return False
-    has_allowed = any(k in location for k in ALLOWED_GEO_KEYWORDS)
-    has_blocked = any(k in location for k in BLOCKED_GEO_KEYWORDS)
-    return has_blocked and not has_allowed
-
 def url_origin_bonus(url):
     u = url.lower()
     if u.startswith("https://ae.linkedin.com"):
@@ -86,7 +59,7 @@ def url_origin_bonus(url):
     if u.startswith("https://qa.linkedin.com"):
         return 0.1
     if u.startswith("https://in.linkedin.com"):
-        return 0.1
+        return 0.0
     return 0.0
 
 def normalize_url(url):
@@ -95,6 +68,12 @@ def normalize_url(url):
 def score_text(text, query, url=""):
     text = text.lower()
     query = query.lower()
+
+    location_match = re.search(r"location:\s*([^\n|·]+)", text)
+    if location_match:
+        loc = location_match.group(1)
+        if not any(k in loc for k in uae_keywords + mena_keywords):
+            return 0.0, "Low", ["Hard reject: explicit non-UAE/MENA location"]
 
     score = BASE_SCORE
     breakdown = [f"Base score from query (+{BASE_SCORE})"]
@@ -201,10 +180,6 @@ if st.button("Run Discovery"):
                     continue
 
                 combined_text = f"{title} {snippet}"
-
-                if is_hard_geo_reject(combined_text):
-                    continue
-
                 score, confidence, breakdown = score_text(combined_text, query, url)
 
                 st.session_state.results.append({
