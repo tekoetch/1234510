@@ -158,8 +158,7 @@ if sample_text:
             st.write(b)
 
 queries = [
-    '"angel investor" UAE site:linkedin.com/in',
-    'angel investor "UAE" site:linkedin.com/in'
+    'angel investor dubai united arab emirates uae site:linkedin.com/in'
 ]
 
 st.subheader("Live Discovery")
