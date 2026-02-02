@@ -52,8 +52,6 @@ uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf"]
 
 def url_origin_bonus(url):
-    if not url:
-        return 0.0
     u = url.lower()
     if u.startswith("https://ae.linkedin.com"):
         return 0.3
@@ -63,7 +61,10 @@ def url_origin_bonus(url):
         return 0.1
     return 0.0
 
-def score_text(text, query, url):
+def normalize_url(url):
+    return url.split("?")[0].lower().strip()
+
+def score_text(text, query, url=""):
     text = text.lower()
     query = query.lower()
 
@@ -133,6 +134,22 @@ def score_text(text, query, url):
     breakdown.insert(0, f"Signal groups fired: {group_count}")
     return score, confidence, breakdown
 
+st.subheader("Manual Scoring Playground")
+
+sample_text = st.text_area(
+    "Paste LinkedIn title + snippet",
+    height=150,
+    placeholder="Angel Investor | Based in Dubai | Investing in early-stage startups"
+)
+
+if sample_text:
+    score, confidence, breakdown = score_text(sample_text, "")
+    st.metric("Score (1–10)", score)
+    st.metric("Confidence", confidence)
+    with st.expander("Why this scored what it scored"):
+        for b in breakdown:
+            st.write(b)
+
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
     'angel investor "UAE" site:linkedin.com/in'
@@ -147,21 +164,16 @@ if st.button("Run Discovery"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
-
                 if not url:
                     continue
 
-                url_key = url.split("?")[0].lower()
-                existing_urls = {row["URL"].split("?")[0].lower() for row in st.session_state.results}
-                if url_key in existing_urls:
+                norm_url = normalize_url(url)
+                existing_urls = {normalize_url(r["URL"]) for r in st.session_state.results}
+                if norm_url in existing_urls:
                     continue
 
                 combined_text = f"{title} {snippet}"
-
-                if freeze_scoring:
-                    score, confidence, breakdown = 0, "Manual", ["Scoring frozen"]
-                else:
-                    score, confidence, breakdown = score_text(combined_text, query, url)
+                score, confidence, breakdown = score_text(combined_text, query, url)
 
                 st.session_state.results.append({
                     "Title": title,
@@ -178,15 +190,28 @@ if st.button("Run Discovery"):
     sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0")
     ws = sh.sheet1
 
-    existing = ws.get_all_records()
-    existing_urls = {r["URL"].split("?")[0].lower() for r in existing}
+    headers = ["Title", "Snippet", "URL", "Score", "Confidence", "Signals"]
+    if ws.row_count == 0 or ws.row_values(1) != headers:
+        ws.clear()
+        ws.append_row(headers)
 
-    new_rows = []
+    sheet_urls = {
+        normalize_url(r["URL"])
+        for r in ws.get_all_records()
+        if r.get("URL")
+    }
+
+    rows_to_add = []
     for _, row in df.iterrows():
-        if row["URL"].split("?")[0].lower() not in existing_urls:
-            new_rows.append(row.tolist())
+        if normalize_url(row["URL"]) not in sheet_urls:
+            rows_to_add.append([
+                row["Title"],
+                row["Snippet"],
+                row["URL"],
+                row["Score"],
+                row["Confidence"],
+                row["Signals"]
+            ])
 
-    if new_rows:
-        ws.append_rows(new_rows, value_input_option="RAW")
-
-    st.success(f"Total leads stored: {len(existing) + len(new_rows)}")
+    if rows_to_add:
+        ws.append_rows(rows_to_add, value_input_option="RAW")
