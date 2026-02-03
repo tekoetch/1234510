@@ -8,6 +8,9 @@ import re
 if "results" not in st.session_state:
     st.session_state.results = []
 
+if "second_pass_results" not in st.session_state:
+    st.session_state.second_pass_results = []
+
 st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
 
@@ -16,9 +19,10 @@ Scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
-credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-gc = gspread.authorize(credentials)
+# ---- GOOGLE SHEETS (PRESERVED, COMMENTED OUT FOR DEMO SAFETY) ----
+# creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
+# credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
+# gc = gspread.authorize(credentials)
 
 freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 
@@ -40,7 +44,7 @@ identity_keywords = [
 ]
 
 behavior_keywords = [
-    "invested in", "investing in", "portfolio",
+    "invested in", "investing in", "portfolio", "capital",
     "seed", "pre-seed", "early-stage", "funding", "fundraising"
 ]
 
@@ -69,12 +73,6 @@ def score_text(text, query, url=""):
     text = text.lower()
     query = query.lower()
 
-    location_match = re.search(r"location:\s*([^\n|·]+)", text)
-    if location_match:
-        loc = location_match.group(1)
-        if not any(k in loc for k in uae_keywords + mena_keywords):
-            return 0.0, "Low", ["Hard reject: explicit non-UAE/MENA location"]
-
     score = BASE_SCORE
     breakdown = [f"Base score from query (+{BASE_SCORE})"]
     signal_groups = set()
@@ -82,10 +80,6 @@ def score_text(text, query, url=""):
     if any(k in query for k in uae_keywords):
         score += 0.3
         breakdown.append("UAE mentioned in query (+0.3)")
-
-    if any(k in query for k in mena_keywords):
-        score += 0.2
-        breakdown.append("MENA mentioned in query (+0.2)")
 
     if any(k in text for k in uae_keywords):
         score += 1.0
@@ -141,54 +135,75 @@ def score_text(text, query, url=""):
     breakdown.insert(0, f"Signal groups fired: {group_count}")
     return score, confidence, breakdown
 
-st.subheader("Manual Scoring Playground")
+# ---------------- SECOND PASS LOGIC ----------------
 
-sample_text = st.text_area(
-    "Paste LinkedIn title + snippet",
-    height=150,
-    placeholder="Angel Investor | Based in Dubai | Investing in early-stage startups"
-)
+def extract_anchors(text):
+    anchors = set()
+    for kw in identity_keywords + behavior_keywords:
+        if kw in text.lower():
+            anchors.add(kw)
+    company_matches = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
+    for c in company_matches:
+        anchors.add(c.lower())
+    return list(anchors)
 
-if sample_text:
-    score, confidence, breakdown = score_text(sample_text, "")
-    st.metric("Score (1–10)", score)
-    st.metric("Confidence", confidence)
-    with st.expander("Why this scored what it scored"):
-        for b in breakdown:
-            st.write(b)
+def name_collision_risk(name):
+    parts = name.split()
+    if len(parts) < 2:
+        return "high"
+    if len(parts[1]) <= 2:
+        return "high"
+    return "low"
 
+def build_second_pass_queries(name, anchors, collision):
+    base = name
+    queries = []
+    if collision == "high":
+        for a in anchors[:2]:
+            queries.append(f"{base} {a}")
+    else:
+        queries.append(f"{base} united arab emirates")
+        if anchors:
+            queries.append(f"{base} {anchors[0]}")
+    return queries[:2]
 
-st.subheader("Manual Search Query (for Second Pass)")
+def score_second_pass(text, anchors):
+    text = text.lower()
+    score = 0
+    signals = []
 
-manual_query = st.text_input(
-    "Type a DuckDuckGo query (e.g. full name + angel investor + UAE)",
-    placeholder="e.g. Masood Orangi angel investor Dubai site:linkedin.com/in"
-)
+    for a in anchors:
+        if a in text:
+            score += 0.5
+            signals.append(f"Anchor match: {a}")
 
-max_results = st.number_input(
-    "Max results",
-    min_value=1,
-    max_value=20,
-    value=20,
-    step=1
-)
+    if any(k in text for k in identity_keywords):
+        score += 1.5
+        signals.append("Confirmed investor identity")
 
+    if any(k in text for k in uae_keywords):
+        score += 1.0
+        signals.append("Confirmed UAE presence")
 
-st.subheader("Live Discovery")
+    if any(x in text for x in ["instagram", "twitter", "tiktok", "facebook"]):
+        score += 0.3
+        signals.append("External social presence")
+
+    return min(score, 5.0), signals
+
+# ---------------- UI ----------------
+
+st.subheader("Live Discovery (First Pass)")
+
+queries = [
+    '"angel investor" UAE site:linkedin.com/in',
+    'angel investor "UAE" site:linkedin.com/in'
+]
 
 if st.button("Run Discovery"):
-    active_queries = []
-
-    if manual_query.strip():
-        active_queries.append(manual_query.strip())
-    else:
-        active_queries.append(
-            "angel investor dubai united arab emirates uae site:linkedin.com/in"
-        )
-
     with DDGS(timeout=10) as ddgs:
-        for query in active_queries:
-            for r in ddgs.text(query, max_results=max_results, backend="html"):
+        for query in queries:
+            for r in ddgs.text(query, max_results=5, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -196,50 +211,48 @@ if st.button("Run Discovery"):
                     continue
 
                 norm_url = normalize_url(url)
-                existing_urls = {normalize_url(r["URL"]) for r in st.session_state.results}
-                if norm_url in existing_urls:
+                if norm_url in {normalize_url(x["URL"]) for x in st.session_state.results}:
                     continue
 
-                combined_text = f"{title} {snippet}"
-                score, confidence, breakdown = score_text(combined_text, query, url)
+                combined = f"{title} {snippet}"
+                score, conf, breakdown = score_text(combined, query, url)
 
                 st.session_state.results.append({
+                    "Name": title.split("-")[0].strip(),
                     "Title": title,
                     "Snippet": snippet,
                     "URL": url,
                     "Score": score,
-                    "Confidence": confidence,
+                    "Confidence": conf,
                     "Signals": " | ".join(breakdown)
                 })
 
-df = pd.DataFrame(st.session_state.results)
-st.dataframe(df, use_container_width=True)
+df_first = pd.DataFrame(st.session_state.results)
+st.subheader("First Pass Results")
+st.dataframe(df_first, use_container_width=True)
 
-sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0")
-ws = sh.sheet1
+st.subheader("Second Pass Verification")
 
-headers = ["Title", "Snippet", "URL", "Score", "Confidence", "Signals"]
-if ws.row_count == 0 or ws.row_values(1) != headers:
-    ws.clear()
-    ws.append_row(headers)
+if st.button("Run Second Pass"):
+    with DDGS(timeout=10) as ddgs:
+        for _, row in df_first.iterrows():
+            name = row["Name"]
+            anchors = extract_anchors(row["Snippet"])
+            collision = name_collision_risk(name)
+            queries_2 = build_second_pass_queries(name, anchors, collision)
 
-sheet_urls = {
-    normalize_url(r["URL"])
-    for r in ws.get_all_records()
-    if r.get("URL")
-}
+            for q in queries_2:
+                for r in ddgs.text(q, max_results=3, backend="html"):
+                    text = f"{r.get('title','')} {r.get('body','')}"
+                    score2, signals2 = score_second_pass(text, anchors)
+                    if score2 > 0:
+                        st.session_state.second_pass_results.append({
+                            "Name": name,
+                            "Query Used": q,
+                            "Second Pass Score": score2,
+                            "Signals": " | ".join(signals2),
+                            "Source URL": r.get("href","")
+                        })
 
-rows_to_add = []
-for _, row in df.iterrows():
-    if normalize_url(row["URL"]) not in sheet_urls:
-        rows_to_add.append([
-            row["Title"],
-            row["Snippet"],
-            row["URL"],
-            row["Score"],
-            row["Confidence"],
-            row["Signals"]
-        ])
-
-if rows_to_add:
-    ws.append_rows(rows_to_add, value_input_option="RAW")
+df_second = pd.DataFrame(st.session_state.second_pass_results)
+st.dataframe(df_second, use_container_width=True)
