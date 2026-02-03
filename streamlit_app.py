@@ -103,7 +103,7 @@ def extract_anchors(text):
     for kw in uae_keywords + mena_keywords:
         if kw in t:
             anchors["geo"].append(kw)
-    companies = re.findall(r"(at|@|with) ([A-Z][A-Za-z0-9 &]+)", t, re.I)
+    companies = re.findall(r"(at|@|with|of|for|in|to|from|at the|of the|for the|in the|to the|from the) ([A-Z][A-Za-z0-9 &']+)", t, re.I)
     for _, c in companies:
         anchors["company"].append(c.strip())
     return anchors
@@ -136,29 +136,43 @@ def score_second_pass(text, url, state, first_snippet):
     if overlap > 0.3:
         score += 1.0
         breakdown.append(f"Snippet overlap ({overlap:.2f}) confirms relevance")
-    identity_seen = any(k in t for k in identity_keywords)
-    behavior_seen = any(k in t for k in behavior_keywords)
-    geo_seen = any(k in t for k in uae_keywords + mena_keywords)
-    if identity_seen and not state["identity_confirmed"]:
+    identity_hits = [k for k in identity_keywords if k in t]
+    if identity_hits:
         score += 1.5
         breakdown.append("Confirmed investor identity")
         state["identity_confirmed"] = True
-    if behavior_seen:
+        for k in identity_hits[1:]:
+            score += 0.5
+            breakdown.append(f"Additional identity '{k}'")
+    behavior_hits = [k for k in behavior_keywords if k in t]
+    if behavior_hits:
         score += 0.5
         breakdown.append("Investment behavior confirmed")
-    if geo_seen and state["identity_confirmed"]:
-        score += 0.3 * state["geo_hits"]
+        for k in behavior_hits[1:]:
+            score += 0.2
+            breakdown.append(f"Additional behavior '{k}'")
+    geo_hits = [k for k in uae_keywords + mena_keywords if k in t]
+    if geo_hits:
+        score += 0.3
         breakdown.append("UAE/MENA geography tied")
         state["geo_hits"] += 1
-    company = re.findall(r"(at|@|with) ([A-Z][A-Za-z0-9 &]+)", t, re.I)
-    if company:
-        breakdown.append(f"Enriched company: {company[0][1]}")
+        for k in geo_hits[1:]:
+            score += 0.1
+            breakdown.append(f"Additional geo '{k}'")
+    if any(d in url for d in bonus_domains):
+        score += 0.4
+        breakdown.append("Bonus domain: potential contact info")
+    company = re.findall(r"(at|@|with|of|for|in|to|from|at the|of the|for the|in the|to the|from the) ([A-Z][A-Za-z0-9 &']+)", t, re.I)
+    companies_str = ", ".join(set(c[1].strip() for c in company)) if company else ""
+    if companies_str:
+        breakdown.append(f"Enriched company: {companies_str}")
         score += 0.4
     social_urls = re.findall(r'(linkedin\.com/in/[\w-]+|x\.com/[\w-]+)', t + url, re.I)
-    if social_urls:
-        breakdown.append(f"Enriched social: {social_urls[0]}")
+    social_str = ", ".join(set(social_urls)) if social_urls else ""
+    if social_str:
+        breakdown.append(f"Enriched social: {social_str}")
         score += 0.4
-    if not (geo_seen and (identity_seen or behavior_seen)):
+    if not (state["geo_hits"] > 0 and (state["identity_confirmed"] or len(behavior_hits) > 0)):
         breakdown.append("Discard: No UAE/investment tie")
         score = 0
     return min(score, 5.0), breakdown, state["identity_confirmed"]
@@ -239,10 +253,10 @@ if not df_second.empty:
         total = g["Second Pass Score"].sum()
         investor = "Yes" if any("confirmed investor identity" in x.lower() for x in g["Score Breakdown"]) else "No"
         uae = "Yes" if any("uae/mena geography tied" in x.lower() for x in g["Score Breakdown"]) else "No"
-        companies = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched company" in b.lower())
-        socials = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched social" in b.lower())
-        company_str = ", ".join(companies) if companies else "None"
-        social_str = ", ".join(socials) if socials else "None"
+        companies = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched company" in x.lower())
+        socials = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched social" in x.lower())
+        company_str = ", ".join(companies) if companies else ""
+        social_str = ", ".join(socials) if socials else ""
         verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
         consolidated.append({
             "Name": name,
