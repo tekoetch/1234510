@@ -157,16 +157,38 @@ if sample_text:
         for b in breakdown:
             st.write(b)
 
-queries = [
-    'angel investor dubai united arab emirates uae site:linkedin.com/in'
-]
+
+st.subheader("Manual Search Query (for Second Pass)")
+
+manual_query = st.text_input(
+    "Type a DuckDuckGo query (e.g. full name + angel investor + UAE)",
+    placeholder="e.g. Masood Orangi angel investor Dubai site:linkedin.com/in"
+)
+
+max_results = st.number_input(
+    "Max results",
+    min_value=1,
+    max_value=20,
+    value=5,
+    step=1
+)
+
 
 st.subheader("Live Discovery")
 
 if st.button("Run Discovery"):
+    active_queries = []
+
+    if manual_query.strip():
+        active_queries.append(manual_query.strip())
+    else:
+        active_queries.append(
+            "angel investor dubai united arab emirates uae site:linkedin.com/in"
+        )
+
     with DDGS(timeout=10) as ddgs:
-        for query in queries:
-            for r in ddgs.text(query, max_results=5, backend="html"):
+        for query in active_queries:
+            for r in ddgs.text(query, max_results=max_results, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -190,34 +212,34 @@ if st.button("Run Discovery"):
                     "Signals": " | ".join(breakdown)
                 })
 
-    df = pd.DataFrame(st.session_state.results)
-    st.dataframe(df, use_container_width=True)
+df = pd.DataFrame(st.session_state.results)
+st.dataframe(df, use_container_width=True)
 
-    sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0")
-    ws = sh.sheet1
+sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/13syl6pUSdsXQ1XNnN_WVCGlpWm-80n6at4pdjZSuoBU/edit#gid=0")
+ws = sh.sheet1
 
-    headers = ["Title", "Snippet", "URL", "Score", "Confidence", "Signals"]
-    if ws.row_count == 0 or ws.row_values(1) != headers:
-        ws.clear()
-        ws.append_row(headers)
+headers = ["Title", "Snippet", "URL", "Score", "Confidence", "Signals"]
+if ws.row_count == 0 or ws.row_values(1) != headers:
+    ws.clear()
+    ws.append_row(headers)
 
-    sheet_urls = {
-        normalize_url(r["URL"])
-        for r in ws.get_all_records()
-        if r.get("URL")
-    }
+sheet_urls = {
+    normalize_url(r["URL"])
+    for r in ws.get_all_records()
+    if r.get("URL")
+}
 
-    rows_to_add = []
-    for _, row in df.iterrows():
-        if normalize_url(row["URL"]) not in sheet_urls:
-            rows_to_add.append([
-                row["Title"],
-                row["Snippet"],
-                row["URL"],
-                row["Score"],
-                row["Confidence"],
-                row["Signals"]
-            ])
+rows_to_add = []
+for _, row in df.iterrows():
+    if normalize_url(row["URL"]) not in sheet_urls:
+        rows_to_add.append([
+            row["Title"],
+            row["Snippet"],
+            row["URL"],
+            row["Score"],
+            row["Confidence"],
+            row["Signals"]
+        ])
 
-    if rows_to_add:
-        ws.append_rows(rows_to_add, value_input_option="RAW")
+if rows_to_add:
+    ws.append_rows(rows_to_add, value_input_option="RAW")
