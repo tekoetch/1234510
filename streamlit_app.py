@@ -1,8 +1,6 @@
 import streamlit as st
 from ddgs import DDGS
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 import re
 
 if "results" not in st.session_state:
@@ -13,11 +11,6 @@ if "second_pass_results" not in st.session_state:
 
 st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
-
-Scopes = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
 
 freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 
@@ -39,8 +32,8 @@ identity_keywords = [
 ]
 
 behavior_keywords = [
-    "invested in", "investing in", "portfolio", "capital",
-    "seed", "pre-seed", "early-stage", "funding", "fundraising"
+    "invested in", "investing in", "portfolio",
+    "seed", "pre-seed", "early-stage", "funding"
 ]
 
 seniority_keywords = [
@@ -56,15 +49,9 @@ noise_domains = [
     "academia.edu", "sciprofiles.com"
 ]
 
-def url_origin_bonus(url):
-    u = url.lower()
-    if u.startswith("https://ae.linkedin.com"):
-        return 0.4
-    if u.startswith("https://qa.linkedin.com"):
-        return 0.1
-    if u.startswith("https://in.linkedin.com"):
-        return 0.0
-    return 0.0
+bonus_domains = ["theorg.com", "rocketreach.co"]
+
+QUERY_BLOCKLIST = {"partner", "ceo", "co-founder"}
 
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
@@ -73,27 +60,8 @@ def score_text(text, query, url=""):
     text = text.lower()
     query = query.lower()
     score = BASE_SCORE
-    breakdown = [f"Base score from query (+{BASE_SCORE})"]
+    breakdown = []
     signal_groups = set()
-
-    if any(k in query for k in uae_keywords):
-        score += 0.3
-        breakdown.append("UAE mentioned in query (+0.3)")
-
-    if any(k in text for k in uae_keywords):
-        score += 1.0
-        signal_groups.add("Geography")
-        breakdown.append("UAE mentioned in text (+1.0)")
-    elif any(k in text for k in mena_keywords):
-        score += 0.6
-        signal_groups.add("Geography")
-        breakdown.append("MENA mentioned in text (+0.6)")
-
-    origin_bonus = url_origin_bonus(url)
-    if origin_bonus > 0:
-        score += origin_bonus
-        breakdown.append(f"URL origin bonus (+{origin_bonus})")
-        signal_groups.add("Geography")
 
     identity_hits = [k for k in identity_keywords if k in text]
     if identity_hits:
@@ -124,6 +92,9 @@ def score_text(text, query, url=""):
         breakdown.append(f"Seniority group bonus (+{SENIORITY_GROUP_BONUS})")
         signal_groups.add("Seniority")
 
+    if any(k in text for k in uae_keywords + mena_keywords):
+        signal_groups.add("Geography")
+
     if "Geography" in signal_groups:
         score += GEO_GROUP_BONUS
         breakdown.append(f"Geography group bonus (+{GEO_GROUP_BONUS})")
@@ -135,56 +106,72 @@ def score_text(text, query, url=""):
     return score, confidence, breakdown
 
 def extract_anchors(text):
-    anchors = set()
+    anchors = {"identity": [], "behavior": [], "company": []}
     t = text.lower()
-    for kw in identity_keywords + behavior_keywords + seniority_keywords:
+
+    for kw in identity_keywords:
+        if kw in t and kw not in QUERY_BLOCKLIST:
+            anchors["identity"].append(kw)
+
+    for kw in behavior_keywords:
         if kw in t:
-            anchors.add(kw)
+            anchors["behavior"].append(kw)
+
     companies = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
     for c in companies:
-        anchors.add(c.lower())
-    return list(anchors)
+        anchors["company"].append(c.strip())
 
-def name_collision_risk(name):
-    parts = name.split()
-    if len(parts) < 2:
-        return "high"
-    if len(parts[0]) <= 3 and len(parts[1]) <= 3:
-        return "high"
-    return "low"
+    return anchors
 
 def build_second_pass_queries(name, anchors):
-    queries = [f"{name} united arab emirates"]
-    if anchors:
-        queries.append(f"{name} {anchors[0]}")
-    return queries
+    queries = []
 
-def score_second_pass(text, anchors, url):
+    if anchors["identity"]:
+        queries.append(f"{name} {anchors['identity'][0]}")
+    elif anchors["behavior"]:
+        queries.append(f"{name} {anchors['behavior'][0]}")
+    elif anchors["company"]:
+        queries.append(f"{name} {anchors['company'][0]} investor")
+
+    queries.append(f"{name} united arab emirates")
+    return queries[:2]
+
+def score_second_pass(text, url, state):
     t = text.lower()
     score = 0
     breakdown = []
 
     if any(d in url for d in noise_domains):
-        return 0, ["Noise domain"]
+        return 0, ["Noise domain"], False
 
-    anchor_hits = [a for a in anchors if a in t]
-    for a in anchor_hits:
-        score += 0.5
-        breakdown.append(f"Anchor match: {a}")
+    if "/in/" in url:
+        if state["linkedin_seen"]:
+            return 0, ["Extra LinkedIn profile ignored"], False
+        state["linkedin_seen"] = True
 
     if any(k in t for k in identity_keywords):
-        score += 1.5
-        breakdown.append("Confirmed investor identity")
+        if not state["identity_confirmed"]:
+            score += 1.5
+            breakdown.append("Confirmed investor identity")
+            state["identity_confirmed"] = True
 
-    if any(k in t for k in uae_keywords):
-        score += 1.0
-        breakdown.append("Confirmed UAE presence")
+    if any(k in t for k in behavior_keywords):
+        score += 0.5
+        breakdown.append("Investment behavior language")
 
-    if any(x in t for x in ["instagram", "twitter", "tiktok", "facebook"]):
-        score += 0.3
-        breakdown.append("External social presence")
+    if any(k in t for k in uae_keywords + mena_keywords):
+        if state["geo_hits"] < 2 and state["identity_confirmed"]:
+            score += 0.3
+            breakdown.append("Supporting geography signal")
+            state["geo_hits"] += 1
 
-    return min(score, 5.0), breakdown
+    for d in bonus_domains:
+        if d in url and d not in state["domain_hits"]:
+            score += 0.4
+            breakdown.append(f"External confirmation via {d}")
+            state["domain_hits"].add(d)
+
+    return min(score, 5.0), breakdown, state["identity_confirmed"]
 
 st.subheader("Live Discovery (First Pass)")
 
@@ -226,9 +213,19 @@ st.subheader("Second Pass Verification")
 if st.button("Run Second Pass"):
     with DDGS(timeout=10) as ddgs:
         for _, row in df_first.iterrows():
+            if row["Score"] < 4.0:
+                continue
+
             name = row["Name"]
             anchors = extract_anchors(row["Snippet"])
             queries_2 = build_second_pass_queries(name, anchors)
+
+            state = {
+                "linkedin_seen": False,
+                "geo_hits": 0,
+                "identity_confirmed": False,
+                "domain_hits": set()
+            }
 
             partial_alignment = False
 
@@ -239,7 +236,7 @@ if st.button("Run Second Pass"):
                 for r in ddgs.text(q, max_results=3, backend="html"):
                     text = f"{r.get('title','')} {r.get('body','')}"
                     url = r.get("href", "")
-                    score2, breakdown2 = score_second_pass(text, anchors, url)
+                    score2, breakdown2, identity_seen = score_second_pass(text, url, state)
                     if score2 > 0:
                         partial_alignment = True
                         st.session_state.second_pass_results.append({
@@ -259,8 +256,8 @@ if not df_second.empty:
     consolidated = []
     for name, g in df_second.groupby("Name"):
         total = g["Second Pass Score"].sum()
-        investor = "Yes" if any("Confirmed investor" in x for x in g["Score Breakdown"]) else "No"
-        uae = "Yes" if any("Confirmed UAE" in x for x in g["Score Breakdown"]) else "No"
+        investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
+        uae = "Yes" if any("Supporting geography signal" in x for x in g["Score Breakdown"]) else "No"
         verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "REVIEW" if total >= 2 else "REJECT"
         consolidated.append({
             "Name": name,
