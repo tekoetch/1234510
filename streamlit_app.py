@@ -264,7 +264,7 @@ if not df_second.empty:
     consolidated = []
     for name, g in df_second.groupby("Name"):
         total_raw = g["Second Pass Score"].sum()
-        total = min(total_raw, 10.0) 
+        total = min(total_raw, 8.0)  # Stronger cap to prevent inflation
         investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
         uae = "Yes" if any("UAE/MENA geography tied" in x for x in g["Score Breakdown"]) else "No"
         
@@ -275,19 +275,22 @@ if not df_second.empty:
             b_lower = b.lower()
             if "enriched company" in b_lower:
                 try:
-                    company_part = b.split(": ", 1)[1].strip()
-                    companies.add(company_part)
+                    # Take only the part after ": " and before any comma or extra text
+                    company_part = b.split(": ", 1)[1].split(",", 1)[0].strip()
+                    if len(company_part) > 3:  # Avoid tiny garbage
+                        companies.add(company_part)
                 except:
-                    pass  
+                    pass
             if "rocketreach.co" in b_lower:
                 has_rocketreach = True
         
-        company_str = ", ".join(companies) if companies else ""
+        company_str = ", ".join(sorted(companies)) if companies else ""
         enriched_social = "Yes (RocketReach)" if has_rocketreach else ""
         
-        if investor == "Yes" and uae == "Yes" and total >= 4:
+        # Stricter verdict: require both investor + UAE + reasonable score
+        if investor == "Yes" and uae == "Yes" and total >= 4.5:
             verdict = "ACCEPT"
-        elif total >= 2:
+        elif total >= 2.5:
             verdict = "GOOD"
         else:
             verdict = "REJECT"
@@ -295,7 +298,7 @@ if not df_second.empty:
         consolidated.append({
             "Name": name,
             "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
-            "Second Pass Total": round(total, 1), 
+            "Second Pass Total": round(total, 1),
             "Evidence Rows": len(g),
             "Investor Confirmed": investor,
             "UAE Confirmed": uae,
@@ -303,6 +306,28 @@ if not df_second.empty:
             "Enriched Social": enriched_social,
             "Final Verdict": verdict
         })
+    
+    df_consolidated = pd.DataFrame(consolidated)
+    st.subheader("Consolidated Review Table")
+    # Show only ACCEPT/GOOD by default for cleaner demo
+    st.dataframe(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])], use_container_width=True)
+    st.metric("Accepted Leads", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+    
+    for _, row in df_consolidated.iterrows():
+        with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
+            st.write("First-Pass Snippet:", df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0])
+            st.write("Verification Evidence:", df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist())
+    
+    df_consolidated = pd.DataFrame(consolidated)
+    st.subheader("Consolidated Review Table")
+    # Show only ACCEPT/GOOD by default for cleaner demo
+    st.dataframe(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])], use_container_width=True)
+    st.metric("Accepted Leads", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+    
+    for _, row in df_consolidated.iterrows():
+        with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
+            st.write("First-Pass Snippet:", df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0])
+            st.write("Verification Evidence:", df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist())
     
     df_consolidated = pd.DataFrame(consolidated)
     st.subheader("Consolidated Review Table")
