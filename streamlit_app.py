@@ -253,8 +253,8 @@ if not df_second.empty:
         total = g["Second Pass Score"].sum()
         investor = "Yes" if any("confirmed investor identity" in x.lower() for x in g["Score Breakdown"]) else "No"
         uae = "Yes" if any("uae/mena geography tied" in x.lower() for x in g["Score Breakdown"]) else "No"
-        companies = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched company" in x.lower())
-        socials = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched social" in x.lower())
+        companies = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched company" in b.lower())
+        socials = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched social" in b.lower())
         company_str = ", ".join(companies) if companies else ""
         social_str = ", ".join(socials) if socials else ""
         verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
