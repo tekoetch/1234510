@@ -275,12 +275,12 @@ if not df_second.empty:
             b_lower = b.lower()
             if "enriched company" in b_lower:
                 try:
-                    part = b.split(": ", 1)[1].strip()
-                    if len(part.split()) <= 6 and not any(p in part.lower() for p in ["experience", "previous", "roles", "based", "located"]):
-                        companies.add(part)
+                    # Take only the part after ": " and before any comma or extra text
+                    company_part = b.split(": ", 1)[1].split(",", 1)[0].strip()
+                    if len(company_part) > 3:  # Avoid tiny garbage
+                        companies.add(company_part)
                 except:
                     pass
-            company_str = ", ".join(sorted(companies)) if companies else ""    
             if "rocketreach.co" in b_lower:
                 has_rocketreach = True
         
