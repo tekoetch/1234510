@@ -263,27 +263,39 @@ st.dataframe(df_second, use_container_width=True)
 if not df_second.empty:
     consolidated = []
     for name, g in df_second.groupby("Name"):
-        total = g["Second Pass Score"].sum()
+        total_raw = g["Second Pass Score"].sum()
+        total = min(total_raw, 10.0) 
         investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
         uae = "Yes" if any("UAE/MENA geography tied" in x for x in g["Score Breakdown"]) else "No"
+        
         companies = set()
         has_rocketreach = False
+        
         for b in g["Score Breakdown"]:
             b_lower = b.lower()
             if "enriched company" in b_lower:
                 try:
-                    companies.add(b.split(": ", 1)[1].strip())
+                    company_part = b.split(": ", 1)[1].strip()
+                    companies.add(company_part)
                 except:
-                    pass
-            if "potential contact via rocketreach" in b_lower:
+                    pass  
+            if "rocketreach.co" in b_lower:
                 has_rocketreach = True
+        
         company_str = ", ".join(companies) if companies else ""
         enriched_social = "Yes (RocketReach)" if has_rocketreach else ""
-        verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
+        
+        if investor == "Yes" and uae == "Yes" and total >= 4:
+            verdict = "ACCEPT"
+        elif total >= 2:
+            verdict = "GOOD"
+        else:
+            verdict = "REJECT"
+        
         consolidated.append({
             "Name": name,
             "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
-            "Second Pass Total": round(total, 2),
+            "Second Pass Total": round(total, 1), 
             "Evidence Rows": len(g),
             "Investor Confirmed": investor,
             "UAE Confirmed": uae,
@@ -291,10 +303,12 @@ if not df_second.empty:
             "Enriched Social": enriched_social,
             "Final Verdict": verdict
         })
+    
     df_consolidated = pd.DataFrame(consolidated)
     st.subheader("Consolidated Review Table")
     st.dataframe(df_consolidated, use_container_width=True)
     st.metric("Accepted Leads", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+    
     for _, row in df_consolidated.iterrows():
         with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
             st.write("First-Pass Snippet:", df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0])
