@@ -275,20 +275,19 @@ if not df_second.empty:
         
         companies = set()
         has_rocketreach = False
-        
-        for b in g["Score Breakdown"]:
-            b_lower = b.lower()
-            if "enriched company" in b_lower:
-                try:
-                    # Take only the part after ": " and before any comma or extra text
-                    company_part = b.split(": ", 1)[1].split(",", 1)[0].strip()
-                    if len(company_part) > 3:  # Avoid tiny garbage
-                        companies.add(company_part)
-                except:
-                    pass
-            if "rocketreach.co" in b_lower:
+
+        snippets = df_second[df_second["Name"] == name]["Snippet"].tolist()
+        urls = df_second[df_second["Name"] == name]["Source URL"].tolist()
+
+        for s in snippets:
+            matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
+            for _, company in matches:
+                companies.add(company.strip())
+
+        for u in urls:
+            if "rocketreach.co" in u:
                 has_rocketreach = True
-        
+
         company_str = ", ".join(sorted(companies)) if companies else ""
         enriched_social = "Yes (RocketReach)" if has_rocketreach else ""
         
@@ -316,7 +315,11 @@ if not df_second.empty:
     st.subheader("Consolidated Review Table")
     # Show only ACCEPT/GOOD by default for cleaner demo
     st.dataframe(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])], use_container_width=True)
-    st.metric("Green List", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"+"GOOD"]))
+    st.metric(
+        "Green List",
+        len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
+    )
+
     
     for _, row in df_consolidated.iterrows():
         with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
