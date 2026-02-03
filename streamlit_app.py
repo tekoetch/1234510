@@ -159,9 +159,10 @@ def score_second_pass(text, url, state, first_snippet):
         for k in geo_hits[1:]:
             score += 0.1
             breakdown.append(f"Additional geo '{k}'")
-    if any(d in url for d in bonus_domains):
-        score += 0.4
-        breakdown.append(f"Potential contact via {d}")
+    for d in bonus_domains:
+        if d in url:
+            score += 0.4
+            breakdown.append(f"Potential contact via {d}")
     company = re.findall(r"(at|@|with|of|for|in|to|from|at the|of the|for the|in the|to the|from the) ([A-Z][A-Za-z0-9 &']+)", t, re.I)
     companies_str = ", ".join(set(c[1].strip() for c in company)) if company else ""
     if companies_str:
