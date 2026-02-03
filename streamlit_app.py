@@ -235,12 +235,14 @@ if st.button("Run Second Pass"):
                 if idx == 1 and not partial_alignment:
                     break
 
-                for r in ddgs.text(q, max_results=3, backend="html"):
+                for r in ddgs.text(q, max_results=20, backend="html"):
                     text = f"{r.get('title','')} {r.get('body','')}"
                     url = r.get("href", "")
                     score2, breakdown2, identity_seen = score_second_pass(text, url, state)
+
                     if score2 > 0:
                         partial_alignment = True
+
                         st.session_state.second_pass_results.append({
                             "Name": name,
                             "Query Used": q,
