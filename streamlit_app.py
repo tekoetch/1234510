@@ -19,11 +19,6 @@ Scopes = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# ---- GOOGLE SHEETS (PRESERVED, COMMENTED OUT FOR DEMO SAFETY) ----
-# creds_info = st.secrets["GCP_SERVICE_ACCOUNT_JSON"]
-# credentials = Credentials.from_service_account_info(creds_info, scopes=Scopes)
-# gc = gspread.authorize(credentials)
-
 freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
 
 st.sidebar.header("Scoring Controls")
@@ -56,6 +51,11 @@ seniority_keywords = [
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf"]
 
+noise_domains = [
+    "wikipedia.org", "saatchiart.com", "researchgate.net",
+    "academia.edu", "sciprofiles.com"
+]
+
 def url_origin_bonus(url):
     u = url.lower()
     if u.startswith("https://ae.linkedin.com"):
@@ -72,7 +72,6 @@ def normalize_url(url):
 def score_text(text, query, url=""):
     text = text.lower()
     query = query.lower()
-
     score = BASE_SCORE
     breakdown = [f"Base score from query (+{BASE_SCORE})"]
     signal_groups = set()
@@ -135,15 +134,14 @@ def score_text(text, query, url=""):
     breakdown.insert(0, f"Signal groups fired: {group_count}")
     return score, confidence, breakdown
 
-# ---------------- SECOND PASS LOGIC ----------------
-
 def extract_anchors(text):
     anchors = set()
-    for kw in identity_keywords + behavior_keywords:
-        if kw in text.lower():
+    t = text.lower()
+    for kw in identity_keywords + behavior_keywords + seniority_keywords:
+        if kw in t:
             anchors.add(kw)
-    company_matches = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
-    for c in company_matches:
+    companies = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
+    for c in companies:
         anchors.add(c.lower())
     return list(anchors)
 
@@ -151,47 +149,42 @@ def name_collision_risk(name):
     parts = name.split()
     if len(parts) < 2:
         return "high"
-    if len(parts[1]) <= 2:
+    if len(parts[0]) <= 3 and len(parts[1]) <= 3:
         return "high"
     return "low"
 
-def build_second_pass_queries(name, anchors, collision):
-    base = name
-    queries = []
-    if collision == "high":
-        for a in anchors[:2]:
-            queries.append(f"{base} {a}")
-    else:
-        queries.append(f"{base} united arab emirates")
-        if anchors:
-            queries.append(f"{base} {anchors[0]}")
-    return queries[:2]
+def build_second_pass_queries(name, anchors):
+    queries = [f"{name} united arab emirates"]
+    if anchors:
+        queries.append(f"{name} {anchors[0]}")
+    return queries
 
-def score_second_pass(text, anchors):
-    text = text.lower()
+def score_second_pass(text, anchors, url):
+    t = text.lower()
     score = 0
-    signals = []
+    breakdown = []
 
-    for a in anchors:
-        if a in text:
-            score += 0.5
-            signals.append(f"Anchor match: {a}")
+    if any(d in url for d in noise_domains):
+        return 0, ["Noise domain"]
 
-    if any(k in text for k in identity_keywords):
+    anchor_hits = [a for a in anchors if a in t]
+    for a in anchor_hits:
+        score += 0.5
+        breakdown.append(f"Anchor match: {a}")
+
+    if any(k in t for k in identity_keywords):
         score += 1.5
-        signals.append("Confirmed investor identity")
+        breakdown.append("Confirmed investor identity")
 
-    if any(k in text for k in uae_keywords):
+    if any(k in t for k in uae_keywords):
         score += 1.0
-        signals.append("Confirmed UAE presence")
+        breakdown.append("Confirmed UAE presence")
 
-    if any(x in text for x in ["instagram", "twitter", "tiktok", "facebook"]):
+    if any(x in t for x in ["instagram", "twitter", "tiktok", "facebook"]):
         score += 0.3
-        signals.append("External social presence")
+        breakdown.append("External social presence")
 
-    return min(score, 5.0), signals
-
-# ---------------- UI ----------------
+    return min(score, 5.0), breakdown
 
 st.subheader("Live Discovery (First Pass)")
 
@@ -209,14 +202,11 @@ if st.button("Run Discovery"):
                 url = r.get("href", "")
                 if not url:
                     continue
-
                 norm_url = normalize_url(url)
                 if norm_url in {normalize_url(x["URL"]) for x in st.session_state.results}:
                     continue
-
                 combined = f"{title} {snippet}"
                 score, conf, breakdown = score_text(combined, query, url)
-
                 st.session_state.results.append({
                     "Name": title.split("-")[0].strip(),
                     "Title": title,
@@ -238,21 +228,50 @@ if st.button("Run Second Pass"):
         for _, row in df_first.iterrows():
             name = row["Name"]
             anchors = extract_anchors(row["Snippet"])
-            collision = name_collision_risk(name)
-            queries_2 = build_second_pass_queries(name, anchors, collision)
+            queries_2 = build_second_pass_queries(name, anchors)
 
-            for q in queries_2:
+            partial_alignment = False
+
+            for idx, q in enumerate(queries_2):
+                if idx == 1 and not partial_alignment:
+                    break
+
                 for r in ddgs.text(q, max_results=3, backend="html"):
                     text = f"{r.get('title','')} {r.get('body','')}"
-                    score2, signals2 = score_second_pass(text, anchors)
+                    url = r.get("href", "")
+                    score2, breakdown2 = score_second_pass(text, anchors, url)
                     if score2 > 0:
+                        partial_alignment = True
                         st.session_state.second_pass_results.append({
                             "Name": name,
                             "Query Used": q,
+                            "Snippet": text,
                             "Second Pass Score": score2,
-                            "Signals": " | ".join(signals2),
-                            "Source URL": r.get("href","")
+                            "Score Breakdown": " | ".join(breakdown2),
+                            "Source URL": url
                         })
 
 df_second = pd.DataFrame(st.session_state.second_pass_results)
+st.subheader("Second Pass Evidence")
 st.dataframe(df_second, use_container_width=True)
+
+if not df_second.empty:
+    consolidated = []
+    for name, g in df_second.groupby("Name"):
+        total = g["Second Pass Score"].sum()
+        investor = "Yes" if any("Confirmed investor" in x for x in g["Score Breakdown"]) else "No"
+        uae = "Yes" if any("Confirmed UAE" in x for x in g["Score Breakdown"]) else "No"
+        verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "REVIEW" if total >= 2 else "REJECT"
+        consolidated.append({
+            "Name": name,
+            "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
+            "Second Pass Total": round(total, 2),
+            "Evidence Rows": len(g),
+            "Investor Confirmed": investor,
+            "UAE Confirmed": uae,
+            "Final Verdict": verdict
+        })
+
+    df_consolidated = pd.DataFrame(consolidated)
+    st.subheader("Consolidated Review Table")
+    st.dataframe(df_consolidated, use_container_width=True)
