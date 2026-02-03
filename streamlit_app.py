@@ -316,7 +316,7 @@ if not df_second.empty:
     st.subheader("Consolidated Review Table")
     # Show only ACCEPT/GOOD by default for cleaner demo
     st.dataframe(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])], use_container_width=True)
-    st.metric("Accepted Leads", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+    st.metric("Green List", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"+"GOOD"]))
     
     for _, row in df_consolidated.iterrows():
         with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
