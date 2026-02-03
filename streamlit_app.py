@@ -127,17 +127,19 @@ def extract_anchors(text):
     return anchors
 
 def build_second_pass_queries(name, anchors):
+    quoted_name = f'"{name}"'
     queries = []
 
     if anchors["identity"]:
-        queries.append(f"{name} {anchors['identity'][0]}")
+        queries.append(f'{quoted_name} {anchors["identity"][0]}')
     elif anchors["behavior"]:
-        queries.append(f"{name} {anchors['behavior'][0]}")
+        queries.append(f'{quoted_name} {anchors["behavior"][0]}')
     elif anchors["company"]:
-        queries.append(f"{name} {anchors['company'][0]} investor")
+        queries.append(f'{quoted_name} {anchors["company"][0]} investor')
 
-    queries.append(f"{name} united arab emirates")
+    queries.append(f'{quoted_name} "United Arab Emirates"')
     return queries[:2]
+
 
 def score_second_pass(text, url, state):
     t = text.lower()
@@ -146,6 +148,9 @@ def score_second_pass(text, url, state):
 
     if any(d in url for d in noise_domains):
         return 0, ["Noise domain"], False
+    
+    if "linkedin.com/pub/dir" in url:
+        return 0, ["LinkedIn directory page ignored"], False
 
     if "/in/" in url:
         if state["linkedin_seen"]:
@@ -172,6 +177,7 @@ def score_second_pass(text, url, state):
         if d in url and d not in state["domain_hits"]:
             score += 0.4
             breakdown.append(f"External confirmation via {d}")
+            breakdown.append("Public contact information likely available")
             state["domain_hits"].add(d)
 
     return min(score, 5.0), breakdown, state["identity_confirmed"]
