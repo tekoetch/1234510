@@ -169,7 +169,7 @@ max_results = st.number_input(
     "Max results",
     min_value=1,
     max_value=20,
-    value=5,
+    value=20,
     step=1
 )
 
