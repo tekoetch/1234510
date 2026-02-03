@@ -26,7 +26,7 @@ IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Additional identity boost", 0.2
 BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword boost", 0.1, 2.0, 0.4, 0.1, help="Boost for investment behavior keywords")
 BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.0, 0.5, 0.1, help="Bonus for combined identity and behavior")
 SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword boost", 0.2, 3.0, 1.0, 0.1, help="Boost for seniority terms")
-SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 1.0, 0.5, 0.1, help="Bonus for multiple seniority hits")
+SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 1.0, 0.5, 0.1, help="Bonus for multiple seniority")
 GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 1.0, 0.5, 0.1, help="Bonus for UAE/MENA geography")
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -103,35 +103,21 @@ def extract_anchors(text):
     for kw in uae_keywords + mena_keywords:
         if kw in t:
             anchors["geo"].append(kw)
-    companies = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
-    for c in companies:
+    companies = re.findall(r"(at|@|with) ([A-Z][A-Za-z0-9 &]+)", t, re.I)
+    for _, c in companies:
         anchors["company"].append(c.strip())
     return anchors
-def build_second_pass_queries(name, anchors, first_snippet):
+def build_second_pass_queries(name, anchors):
     quoted_name = f'"{name}"'
     queries = []
-    snippet_keywords = re.findall(r'\b(angel investor|family office|invested in|dubai|uae|mena)\b', first_snippet.lower())
-    context_str = " ".join(set(snippet_keywords))
-    base_query = f'{quoted_name} {context_str}' if context_str else quoted_name
     if anchors["identity"]:
-        queries.append(f'{base_query} {anchors["identity"][0]}')
+        queries.append(f'{quoted_name} {anchors["identity"][0]}')
     elif anchors["behavior"]:
-        queries.append(f'{base_query} {anchors["behavior"][0]}')
+        queries.append(f'{quoted_name} {anchors["behavior"][0]}')
     elif anchors["company"]:
-        queries.append(f'{base_query} {anchors["company"][0]} investor')
-    if anchors["geo"]:
-        queries.append(f'{base_query} {anchors["geo"][0]} investor')
-    queries.append(f'{base_query} "United Arab Emirates"')
-    return list(set(queries[:3]))
-def build_third_pass_queries(name, context):
-    queries_3 = [
-        f'"{name}" {context} site:instagram.com',
-        f'"{name}" {context} site:x.com',
-        f'"{name}" {context} site:facebook.com',
-        f'"{name}" {context} email',
-        f'"{name}" {context} phone'
-    ]
-    return queries_3
+        queries.append(f'{quoted_name} {anchors["company"][0]} investor')
+    queries.append(f'{quoted_name} "United Arab Emirates"')
+    return list(set(queries[:2]))
 def score_second_pass(text, url, state, first_snippet):
     t = text.lower()
     score = 0
@@ -164,11 +150,11 @@ def score_second_pass(text, url, state, first_snippet):
         score += 0.3 * state["geo_hits"]
         breakdown.append("UAE/MENA geography tied")
         state["geo_hits"] += 1
-    company = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", t)
-    social_urls = re.findall(r'(linkedin\.com/in/[\w-]+|x\.com/[\w-]+)', t)
+    company = re.findall(r"(at|@|with) ([A-Z][A-Za-z0-9 &]+)", t, re.I)
     if company:
-        breakdown.append(f"Enriched company: {company[0]}")
+        breakdown.append(f"Enriched company: {company[0][1]}")
         score += 0.4
+    social_urls = re.findall(r'(linkedin\.com/in/[\w-]+|x\.com/[\w-]+)', t + url, re.I)
     if social_urls:
         breakdown.append(f"Enriched social: {social_urls[0]}")
         score += 0.4
@@ -216,7 +202,7 @@ if st.button("Run Second Pass"):
             name = row["Name"]
             first_snippet = row["Snippet"]
             anchors = extract_anchors(first_snippet)
-            queries_2 = build_second_pass_queries(name, anchors, first_snippet)
+            queries_2 = build_second_pass_queries(name, anchors)
             state = {
                 "linkedin_seen": False,
                 "geo_hits": 0,
@@ -235,7 +221,7 @@ if st.button("Run Second Pass"):
                     text = f"{r.get('title','')} {r.get('body','')}"
                     url = r.get("href", "")
                     score2, breakdown2, identity_seen = score_second_pass(text, url, state, first_snippet)
-                    if score2 > 0:
+                    if score2 > 0 and "Discard" not in " | ".join(breakdown2):
                         partial_alignment = True
                         st.session_state.second_pass_results.append({
                             "Name": name,
@@ -251,14 +237,13 @@ if not df_second.empty:
     consolidated = []
     for name, g in df_second.groupby("Name"):
         total = g["Second Pass Score"].sum()
-        investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
-        uae = "Yes" if any("UAE/MENA geography tied" in x for x in g["Score Breakdown"]) else "No"
-        company = next((b.split(": ")[1] for b in g["Score Breakdown"] if "Enriched company" in b), "None")
-        social = next((b.split(": ")[1] for b in g["Score Breakdown"] if "Enriched social" in b), "None")
-        if company == "None" and social == "None":
-            verdict = "Discard/Not Accurate"
-        else:
-            verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
+        investor = "Yes" if any("confirmed investor identity" in x.lower() for x in g["Score Breakdown"]) else "No"
+        uae = "Yes" if any("uae/mena geography tied" in x.lower() for x in g["Score Breakdown"]) else "No"
+        companies = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched company" in b.lower())
+        socials = set(b.split(": ")[1] for b in g["Score Breakdown"] if "enriched social" in b.lower())
+        company_str = ", ".join(companies) if companies else "None"
+        social_str = ", ".join(socials) if socials else "None"
+        verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
         consolidated.append({
             "Name": name,
             "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
@@ -266,8 +251,8 @@ if not df_second.empty:
             "Evidence Rows": len(g),
             "Investor Confirmed": investor,
             "UAE Confirmed": uae,
-            "Enriched Company": company,
-            "Enriched Social": social,
+            "Enriched Company": company_str,
+            "Enriched Social": social_str,
             "Final Verdict": verdict
         })
     df_consolidated = pd.DataFrame(consolidated)
@@ -282,13 +267,19 @@ st.subheader("Presence & Contact Enrichment")
 run_third = st.checkbox("Run Third Pass", value=False)
 if run_third and st.button("Run Third Pass Enrichment"):
     with DDGS(timeout=10) as ddgs:
-        eligible = df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])]["Name"].tolist()
+        eligible = df_consolidated[df_consolidated["Final Verdict"] != "REJECT"]["Name"].tolist()
         for name in eligible:
             row = df_consolidated[df_consolidated["Name"] == name].iloc[0]
             geo = "Dubai UAE MENA" if row["UAE Confirmed"] == "Yes" else ""
             investor_kw = "angel investor invested in" if row["Investor Confirmed"] == "Yes" else ""
             context = f"{geo} {investor_kw}".strip()
-            queries_3 = build_third_pass_queries(name, context)
+            queries_3 = [
+                f'site:instagram.com "{name}" {context}',
+                f'site:x.com "{name}" {context}',
+                f'site:facebook.com "{name}" {context}',
+                f'"{name}" {context} email',
+                f'"{name}" {context} phone'
+            ]
             for q in queries_3:
                 for r in ddgs.text(q, max_results=2, backend="html"):
                     snippet = f"{r.get('title','')} {r.get('body','')}"
