@@ -9,6 +9,9 @@ if "results" not in st.session_state:
 if "second_pass_results" not in st.session_state:
     st.session_state.second_pass_results = []
 
+if "third_pass_results" not in st.session_state:
+    st.session_state.third_pass_results = []
+
 st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
 st.title("Leads Discovery + Scoring Playground")
 
@@ -173,7 +176,7 @@ def score_second_pass(text, url, state):
 
     return min(score, 5.0), breakdown, state["identity_confirmed"]
 
-st.subheader("Live Discovery (First Pass)")
+st.subheader("Discovery & Initial Scoring")
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
@@ -205,10 +208,9 @@ if st.button("Run Discovery"):
                 })
 
 df_first = pd.DataFrame(st.session_state.results)
-st.subheader("First Pass Results")
 st.dataframe(df_first, use_container_width=True)
 
-st.subheader("Second Pass Verification")
+st.subheader("Identity Verification")
 
 if st.button("Run Second Pass"):
     with DDGS(timeout=10) as ddgs:
@@ -249,7 +251,6 @@ if st.button("Run Second Pass"):
                         })
 
 df_second = pd.DataFrame(st.session_state.second_pass_results)
-st.subheader("Second Pass Evidence")
 st.dataframe(df_second, use_container_width=True)
 
 if not df_second.empty:
@@ -272,3 +273,30 @@ if not df_second.empty:
     df_consolidated = pd.DataFrame(consolidated)
     st.subheader("Consolidated Review Table")
     st.dataframe(df_consolidated, use_container_width=True)
+
+    st.subheader("Presence & Contact Enrichment")
+
+    if st.button("Run Third Pass Enrichment"):
+        with DDGS(timeout=10) as ddgs:
+            eligible = df_consolidated[df_consolidated["Final Verdict"] != "REJECT"]["Name"].tolist()
+
+            for name in eligible:
+                queries_3 = [
+                    f'site:instagram.com "{name}"',
+                    f'site:x.com "{name}"',
+                    f'site:facebook.com "{name}"',
+                    f'"{name}" email',
+                    f'"{name}" phone'
+                ]
+
+                for q in queries_3:
+                    for r in ddgs.text(q, max_results=2, backend="html"):
+                        st.session_state.third_pass_results.append({
+                            "Name": name,
+                            "Query Used": q,
+                            "Snippet": f"{r.get("title","")} {r.get("body","")}",
+                            "Source URL": r.get("href","")
+                        })
+
+    df_third = pd.DataFrame(st.session_state.third_pass_results)
+    st.dataframe(df_third, use_container_width=True)
