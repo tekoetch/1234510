@@ -259,7 +259,7 @@ if not df_second.empty:
         total = g["Second Pass Score"].sum()
         investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
         uae = "Yes" if any("Supporting geography signal" in x for x in g["Score Breakdown"]) else "No"
-        verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "REVIEW" if total >= 2 else "REJECT"
+        verdict = "ACCEPT" if total >= 5 and investor == "Yes" else "GOOD" if total >= 2 else "REJECT"
         consolidated.append({
             "Name": name,
             "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
@@ -294,7 +294,7 @@ if not df_second.empty:
                         st.session_state.third_pass_results.append({
                             "Name": name,
                             "Query Used": q,
-                            "Snippet": f"{r.get("title","")} {r.get("body","")}",
+                            "Snippet": f"{r.get('title','')} {r.get('body','')}",
                             "Source URL": r.get("href","")
                         })
 
