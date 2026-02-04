@@ -226,7 +226,10 @@ if st.button("Run Discovery"):
 df_first = pd.DataFrame(st.session_state.results)
 st.dataframe(df_first, use_container_width=True)
 
-first_pass_rejects = df_first[df_first["Score"] < 4.0][["Name", "Score"]]
+if not df_first.empty and "Score" in df_first.columns:
+    first_pass_rejects = df_first[df_first["Score"] < 4.0][["Name", "Score"]]
+else:
+    first_pass_rejects = pd.DataFrame(columns=["Name", "Score"])
 
 st.subheader("Identity Verification")
 
@@ -239,14 +242,18 @@ if st.button("Run Second Pass"):
     progress = st.progress(0)
     status = st.empty()
 
+    processed_names = {x["Name"] for x in st.session_state.second_pass_results}
+
     with DDGS(timeout=10) as ddgs:
         for i, (_, row) in enumerate(eligible_rows.iterrows(), start=1):
-            status.write(f"Verifying identity for {row['Name']} ({i}/{total_names})")
+            name = row["Name"]
+
+            if name in processed_names:
+                continue
+
+            status.write(f"Verifying identity for {name} ({i}/{total_names})")
             progress.progress(i / total_names)
 
-            if row["Score"] < 4.0: continue
-
-            name = row["Name"]
             anchors = extract_anchors(row["Snippet"])
             queries_2 = build_second_pass_queries(name, anchors)
 
@@ -271,14 +278,16 @@ if st.button("Run Second Pass"):
                     continue
 
                 for r in results:
-                    text = f"{r.get('title','')} {r.get('body','')}"
                     url = r.get("href", "")
-                    norm_url = normalize_url(url)
+                    if not url:
+                        continue
 
+                    norm_url = normalize_url(url)
                     if any(bad in norm_url for bad in blocked_urls):
                         continue
 
-                    score2, breakdown2, identity_seen = score_second_pass(text, url, state)
+                    text = f"{r.get('title','')} {r.get('body','')}"
+                    score2, breakdown2, _ = score_second_pass(text, url, state)
 
                     if score2 > 0:
                         partial_alignment = True
@@ -293,6 +302,10 @@ if st.button("Run Second Pass"):
 
                         df_live = pd.DataFrame(st.session_state.second_pass_results)
                         second_pass_placeholder.dataframe(df_live, use_container_width=True)
+
+    progress.empty()
+    status.empty()
+
 
 df_second = pd.DataFrame(st.session_state.second_pass_results)
 st.dataframe(df_second, use_container_width=True)
