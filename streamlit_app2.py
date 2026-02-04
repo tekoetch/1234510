@@ -306,75 +306,75 @@ if st.button("Run Second Pass"):
     progress.empty()
     status.empty()
 
-
 df_second = pd.DataFrame(st.session_state.second_pass_results)
-st.dataframe(df_second, use_container_width=True)
 
-if not df_second.empty:
+if not df_first.empty:
     consolidated = []
-    for name, g in df_second.groupby("Name"):
-        total_raw = g["Second Pass Score"].sum()
-        total = min(total_raw, 6.0) 
-        investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
-        uae = "Yes" if any("UAE/MENA geography tied" in x for x in g["Score Breakdown"]) else "No"
-        
-        companies = set()
-        has_rocketreach = False
 
-        snippets = df_second[df_second["Name"] == name]["Snippet"].tolist()
-        urls = df_second[df_second["Name"] == name]["Source URL"].tolist()
+    verified_names = set(df_second["Name"]) if not df_second.empty else set()
+    all_first_pass_names = set(df_first["Name"])
 
-        for s in snippets:
-            matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
-            for _, company in matches:
-                companies.add(company.strip())
+    if not df_second.empty:
+        for name, g in df_second.groupby("Name"):
+            total_raw = g["Second Pass Score"].sum()
+            total = min(total_raw, 6.0)
 
-        for u in urls:
-            if "rocketreach.co" in u:
-                has_rocketreach = True
+            investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
+            uae = "Yes" if any("geography" in x.lower() for x in g["Score Breakdown"]) else "No"
 
-        company_str = ", ".join(sorted(companies)) if companies else ""
-        enriched_social = "Yes (RocketReach)" if has_rocketreach else ""
-        
-        if investor == "Yes" and uae == "Yes" and total >= 4.5:
-            verdict = "ACCEPT"
-        elif total >= 2.5:
-            verdict = "GOOD"
-        else:
-            verdict = "REJECT"
-        
-        consolidated.append({
-            "Name": name,
-            "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
-            "Second Pass Total": round(total, 1),
-            "Evidence Rows": len(g),
-            "Investor Confirmed": investor,
-            "UAE Confirmed": uae,
-            "Enriched Company": company_str,
-            "Enriched Social": enriched_social,
-            "Final Verdict": verdict
-        })
-    
+            companies = set()
+            has_rocketreach = False
+
+            snippets = g["Snippet"].tolist()
+            urls = g["Source URL"].tolist()
+
+            for s in snippets:
+                matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
+                for _, company in matches:
+                    companies.add(company.strip())
+
+            for u in urls:
+                if "rocketreach.co" in u:
+                    has_rocketreach = True
+
+            if investor == "Yes" and uae == "Yes" and total >= 4.5:
+                verdict = "ACCEPT"
+            elif total >= 2.5:
+                verdict = "GOOD"
+            else:
+                verdict = "REJECT"
+
+            consolidated.append({
+                "Name": name,
+                "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
+                "Second Pass Total": round(total, 1),
+                "Evidence Rows": len(g),
+                "Investor Confirmed": investor,
+                "UAE Confirmed": uae,
+                "Enriched Company": ", ".join(sorted(companies)),
+                "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
+                "Final Verdict": verdict
+            })
+
+    pending_names = all_first_pass_names - verified_names
+
+    for name in pending_names:
+        row = df_first[df_first["Name"] == name].iloc[0]
+
+        if row["Score"] >= 4.0:
+            consolidated.append({
+                "Name": name,
+                "First Pass Score": row["Score"],
+                "Second Pass Total": 0.0,
+                "Evidence Rows": 0,
+                "Investor Confirmed": "Pending",
+                "UAE Confirmed": "Pending",
+                "Enriched Company": "",
+                "Enriched Social": "",
+                "Final Verdict": "PENDING"
+            })
+
     df_consolidated = pd.DataFrame(consolidated)
-    second_pass_names = set(df_consolidated["Name"])
-    first_pass_names = set(df_first["Name"])
-
-    for _, row in first_pass_rejects.iterrows():
-        if row["Name"] not in second_pass_names:
-            df_consolidated = pd.concat([
-                df_consolidated,
-                pd.DataFrame([{
-                    "Name": row["Name"],
-                    "First Pass Score": row["Score"],
-                    "Second Pass Total": 0.0,
-                    "Evidence Rows": 0,
-                    "Investor Confirmed": "No",
-                    "UAE Confirmed": "No",
-                    "Enriched Company": "",
-                    "Enriched Social": "",
-                    "Final Verdict": "REJECT (First Pass)"
-                }])
-            ], ignore_index=True)
 
     st.subheader("Consolidated Review Table")
     st.dataframe(
@@ -389,16 +389,24 @@ if not df_second.empty:
         "Green List",
         len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
     )
+
     st.metric(
-    "Leads Verified",
-    df_second["Name"].nunique()
+        "Leads Verified",
+        len(verified_names)
     )
 
-    
     for _, row in df_consolidated.iterrows():
         with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
-            st.write("First-Pass Snippet:", df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0])
-            st.write("Verification Evidence:", df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist())
+            st.write(
+                "First-Pass Snippet:",
+                df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0]
+            )
+
+            if row["Name"] in verified_names:
+                st.write(
+                    "Verification Evidence:",
+                    df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist()
+                )
 
     st.subheader("Presence & Contact Enrichment")
 
@@ -416,12 +424,25 @@ if not df_second.empty:
                 ]
 
                 for q in queries_3:
-                    for r in ddgs.text(q, max_results=2, backend="html"):
+                    try:
+                        results = ddgs.text(q, max_results=2, backend="html")
+                    except Exception:
+                        continue
+
+                    for r in results:
+                        url = r.get("href", "")
+                        if not url:
+                            continue
+
+                        norm_url = normalize_url(url)
+                        if any(bad in norm_url for bad in blocked_urls):
+                            continue
+
                         st.session_state.third_pass_results.append({
                             "Name": name,
                             "Query Used": q,
                             "Snippet": f"{r.get('title','')} {r.get('body','')}",
-                            "Source URL": r.get("href","")
+                            "Source URL": url
                         })
 
     df_third = pd.DataFrame(st.session_state.third_pass_results)
