@@ -198,7 +198,7 @@ queries = [
 if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
-            for r in ddgs.text(query, max_results=5, backend="html"):
+            for r in ddgs.text(query, max_results=10, backend="html"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -227,7 +227,7 @@ df_first = pd.DataFrame(st.session_state.results)
 st.dataframe(df_first, use_container_width=True)
 
 if not df_first.empty and "Score" in df_first.columns:
-    first_pass_rejects = df_first[df_first["Score"] < 4.0][["Name", "Score"]]
+    first_pass_rejects = df_first[df_first["Score"] < 3.8][["Name", "Score"]]
 else:
     first_pass_rejects = pd.DataFrame(columns=["Name", "Score"])
 
@@ -236,7 +236,7 @@ st.subheader("Identity Verification")
 second_pass_placeholder = st.empty()
 
 if st.button("Run Second Pass"):
-    eligible_rows = df_first[df_first["Score"] >= 4.0]
+    eligible_rows = df_first[df_first["Score"] >= 3.8]
     total_names = len(eligible_rows)
 
     progress = st.progress(0)
@@ -361,7 +361,7 @@ if not df_first.empty:
     for name in pending_names:
         row = df_first[df_first["Name"] == name].iloc[0]
 
-        if row["Score"] >= 4.0:
+        if row["Score"] >= 3.8:
             consolidated.append({
                 "Name": name,
                 "First Pass Score": row["Score"],
