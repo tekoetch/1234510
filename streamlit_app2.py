@@ -195,6 +195,25 @@ queries = [
     'angel investor "UAE" site:linkedin.com/in'
 ]
 
+def is_valid_person_name(name: str) -> bool:
+    if not name:
+        return False
+
+    n = name.lower().strip()
+
+    bad_exact = {
+        "angel investor",
+    }
+
+    if n in bad_exact:
+        return False
+
+    if len(name.split()) < 2:
+        return False
+
+    return True
+
+
 if st.button("Run Discovery"):
     with DDGS(timeout=10) as ddgs:
         for query in queries:
@@ -213,8 +232,13 @@ if st.button("Run Discovery"):
                     continue
                 combined = f"{title} {snippet}"
                 score, conf, breakdown = score_text(combined, query, url)
+                name = title.split("-")[0].strip()
+
+                if not is_valid_person_name(name):
+                    continue
+
                 st.session_state.results.append({
-                    "Name": title.split("-")[0].strip(),
+                    "Name": name,
                     "Title": title,
                     "Snippet": snippet,
                     "URL": url,
@@ -242,6 +266,7 @@ if st.button("Run Second Pass"):
 
     progress = st.progress(0)
     status = st.empty()
+    second_pass_placeholder.empty()
 
     processed_names = {x["Name"] for x in st.session_state.second_pass_results}
 
@@ -308,6 +333,16 @@ if st.button("Run Second Pass"):
     status.empty()
 
 df_second = pd.DataFrame(st.session_state.second_pass_results)
+
+if not df_second.empty:
+    st.subheader("Second Pass Verification Results")
+    st.dataframe(
+        df_second.sort_values(
+            by=["Name", "Second Pass Score"],
+            ascending=[True, False]
+        ),
+        use_container_width=True
+    )
 
 if not df_first.empty:
     consolidated = []
@@ -404,7 +439,6 @@ if not df_first.empty:
         len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
     )
 
-    st.divider()
     st.subheader("Review List")
     show_green_only = st.checkbox(
         "Show Green List only",
