@@ -52,6 +52,12 @@ noise_domains = [
     "academia.edu", "sciprofiles.com"
 ]
 
+blocked_urls = [
+    "bing.com/aclick",
+    "bing.com/ck/a",
+    "doubleclick.net"
+]
+
 bonus_domains = ["theorg.com", "rocketreach.co"]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder"}
@@ -198,7 +204,11 @@ if st.button("Run Discovery"):
                 url = r.get("href", "")
                 if not url:
                     continue
+
                 norm_url = normalize_url(url)
+                if any(bad in norm_url for bad in blocked_urls):
+                    continue
+
                 if norm_url in {normalize_url(x["URL"]) for x in st.session_state.results}:
                     continue
                 combined = f"{title} {snippet}"
@@ -215,6 +225,8 @@ if st.button("Run Discovery"):
 
 df_first = pd.DataFrame(st.session_state.results)
 st.dataframe(df_first, use_container_width=True)
+
+first_pass_rejects = df_first[df_first["Score"] < 4.0][["Name", "Score"]]
 
 st.subheader("Identity Verification")
 
@@ -251,6 +263,8 @@ if st.button("Run Second Pass"):
                 if idx == 1 and not partial_alignment:
                     break
 
+                status.write(f"Querying: {q}")
+
                 try:
                     results = ddgs.text(q, max_results=20, backend="html")
                 except Exception:
@@ -259,6 +273,11 @@ if st.button("Run Second Pass"):
                 for r in results:
                     text = f"{r.get('title','')} {r.get('body','')}"
                     url = r.get("href", "")
+                    norm_url = normalize_url(url)
+
+                    if any(bad in norm_url for bad in blocked_urls):
+                        continue
+
                     score2, breakdown2, identity_seen = score_second_pass(text, url, state)
 
                     if score2 > 0:
@@ -324,8 +343,35 @@ if not df_second.empty:
         })
     
     df_consolidated = pd.DataFrame(consolidated)
+    second_pass_names = set(df_consolidated["Name"])
+    first_pass_names = set(df_first["Name"])
+
+    for _, row in first_pass_rejects.iterrows():
+        if row["Name"] not in second_pass_names:
+            df_consolidated = pd.concat([
+                df_consolidated,
+                pd.DataFrame([{
+                    "Name": row["Name"],
+                    "First Pass Score": row["Score"],
+                    "Second Pass Total": 0.0,
+                    "Evidence Rows": 0,
+                    "Investor Confirmed": "No",
+                    "UAE Confirmed": "No",
+                    "Enriched Company": "",
+                    "Enriched Social": "",
+                    "Final Verdict": "REJECT (First Pass)"
+                }])
+            ], ignore_index=True)
+
     st.subheader("Consolidated Review Table")
-    st.dataframe(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])], use_container_width=True)
+    st.dataframe(
+        df_consolidated.sort_values(
+            by=["Final Verdict", "Second Pass Total"],
+            ascending=[True, False]
+        ),
+        use_container_width=True
+    )
+
     st.metric(
         "Green List",
         len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
