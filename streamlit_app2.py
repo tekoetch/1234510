@@ -12,10 +12,10 @@ if "second_pass_results" not in st.session_state:
 if "third_pass_results" not in st.session_state:
     st.session_state.third_pass_results = []
 
-st.set_page_config(page_title="Leads Dashboard + Scoring Playground", layout="wide")
-st.title("Leads Discovery + Scoring Playground")
+st.set_page_config(page_title="Leads Dashboard", layout="wide")
+st.title("Leads Discovery")
 
-freeze_scoring = st.toggle("Freeze scoring (manual review mode)", value=False)
+freeze_scoring = st.toggle("Freeze scoring (manual)", value=False)
 
 st.sidebar.header("Scoring Controls")
 
@@ -188,7 +188,7 @@ def score_second_pass(text, url, state):
 
     return min(score, 5.0), breakdown, state["identity_confirmed"]
 
-st.subheader("Discovery & Initial Scoring")
+st.subheader("Public Lead Discovery")
 
 queries = [
     '"angel investor" UAE site:linkedin.com/in',
@@ -231,7 +231,8 @@ if not df_first.empty and "Score" in df_first.columns:
 else:
     first_pass_rejects = pd.DataFrame(columns=["Name", "Score"])
 
-st.subheader("Identity Verification")
+st.divider()
+st.subheader("Automated Verification Engine")
 
 second_pass_placeholder = st.empty()
 
@@ -337,6 +338,13 @@ if not df_first.empty:
                 if "rocketreach.co" in u:
                     has_rocketreach = True
 
+            if total >= 4.5:
+                evidence_strength = "Strong"
+            elif total >= 2.5:
+                evidence_strength = "Moderate"
+            else:
+                evidence_strength = "Weak"
+
             if investor == "Yes" and uae == "Yes" and total >= 4.5:
                 verdict = "ACCEPT"
             elif total >= 2.5:
@@ -353,6 +361,7 @@ if not df_first.empty:
                 "UAE Confirmed": uae,
                 "Enriched Company": ", ".join(sorted(companies)),
                 "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
+                "Evidence Strength": evidence_strength,
                 "Final Verdict": verdict
             })
 
@@ -376,12 +385,43 @@ if not df_first.empty:
 
     df_consolidated = pd.DataFrame(consolidated)
 
-    st.subheader("Consolidated Review Table")
+    verdict_rank = {
+        "ACCEPT": 0,
+        "GOOD": 1,
+        "PENDING": 2,
+        "REJECT": 3
+    }
+
+    df_consolidated["Verdict Rank"] = df_consolidated["Final Verdict"].map(verdict_rank)
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric("Leads Discovered", len(df_first))
+    c2.metric("Passed First Filter", len(df_first[df_first["Score"] >= 3.8]))
+    c3.metric("Verified", len(verified_names))
+    c4.metric(
+        "Green List",
+        len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
+    )
+
+    st.divider()
+    st.subheader("Review List")
+    show_green_only = st.checkbox(
+        "Show Green List only",
+        value=False
+    )
+
+    display_df = df_consolidated
+    if show_green_only:
+        display_df = df_consolidated[
+            df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])
+        ]
+
     st.dataframe(
-        df_consolidated.sort_values(
-            by=["Final Verdict", "Second Pass Total"],
+        display_df.sort_values(
+            by=["Verdict Rank", "Second Pass Total"],
             ascending=[True, False]
-        ),
+        ).drop(columns=["Verdict Rank"]),
         use_container_width=True
     )
 
@@ -407,8 +447,9 @@ if not df_first.empty:
                     "Verification Evidence:",
                     df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist()
                 )
-
-    st.subheader("Presence & Contact Enrichment")
+    
+    st.divider()
+    st.subheader("Outreach Feasibility Check")
 
     if st.button("Run Third Pass Enrichment"):
         with DDGS(timeout=10) as ddgs:
