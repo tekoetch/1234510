@@ -53,6 +53,10 @@ def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
 def score_text(text, query, url=""):
+    if len(text) > 600:
+        breakdown.append("Overlong snippet (possible aggregation)")
+        text = text[:600]
+
     text = text.lower()
     score = BASE_SCORE
     breakdown = []
