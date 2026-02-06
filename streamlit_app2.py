@@ -6,12 +6,6 @@ import re
 if "results" not in st.session_state:
     st.session_state.results = []
 
-if "second_pass_results" not in st.session_state:
-    st.session_state.second_pass_results = []
-
-if "third_pass_results" not in st.session_state:
-    st.session_state.third_pass_results = []
-
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Leads Discovery")
 
@@ -47,18 +41,11 @@ seniority_keywords = [
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf"]
 
-noise_domains = [
-    "wikipedia.org", "saatchiart.com", "researchgate.net",
-    "academia.edu", "sciprofiles.com"
-]
-
 blocked_urls = [
     "bing.com/aclick",
     "bing.com/ck/a",
     "doubleclick.net"
 ]
-
-bonus_domains = ["theorg.com", "rocketreach.co"]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder"}
 
@@ -66,12 +53,7 @@ def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
 def score_text(text, query, url=""):
-    if len(text) > 600:
-        breakdown.append("Overlong snippet (possible aggregation)")
-        text = text[:600]
-
     text = text.lower()
-    query = query.lower()
     score = BASE_SCORE
     breakdown = []
     signal_groups = set()
@@ -107,94 +89,23 @@ def score_text(text, query, url=""):
 
     if any(k in text for k in uae_keywords + mena_keywords):
         signal_groups.add("Geography")
-
-    if "Geography" in signal_groups:
         score += GEO_GROUP_BONUS
         breakdown.append(f"Geography group bonus (+{GEO_GROUP_BONUS})")
 
     score = min(score, 10.0)
-    group_count = len(signal_groups)
-    confidence = "High" if group_count >= 3 else "Medium" if group_count == 2 else "Low"
-    breakdown.insert(0, f"Signal groups fired: {group_count}")
+    confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
+    breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
+
     return score, confidence, breakdown
 
-def extract_anchors(text):
-    anchors = {"identity": [], "behavior": [], "company": []}
-    t = text.lower()
-
-    for kw in identity_keywords:
-        if kw in t and kw not in QUERY_BLOCKLIST:
-            anchors["identity"].append(kw)
-
-    for kw in behavior_keywords:
-        if kw in t:
-            anchors["behavior"].append(kw)
-
-    companies = re.findall(r"at ([A-Z][A-Za-z0-9 &]+)", text)
-    for c in companies:
-        anchors["company"].append(c.strip())
-
-    return anchors
-
-def build_second_pass_queries(name, anchors):
-    quoted_name = f'"{name}"'
-    queries = []
-
-    if anchors["identity"]:
-        queries.append(f'{quoted_name} {anchors["identity"][0]}')
-    elif anchors["behavior"]:
-        queries.append(f'{quoted_name} {anchors["behavior"][0]}')
-    elif anchors["company"]:
-        queries.append(f'{quoted_name} {anchors["company"][0]} investor')
-
-    queries.append(f'{quoted_name} "United Arab Emirates"')
-    return queries[:2]
-
-
-def score_second_pass(text, url, state):
-    t = text.lower()
-    score = 0
-    breakdown = []
-
-    if any(d in url for d in noise_domains):
-        return 0, ["Noise domain"], False
-    
-    if "linkedin.com/pub/dir" in url:
-        return 0, ["LinkedIn directory page ignored"], False
-
-    if "/in/" in url:
-        if state["linkedin_seen"]:
-            return 0, ["Extra LinkedIn profile ignored"], False
-        state["linkedin_seen"] = True
-
-    if any(k in t for k in identity_keywords):
-        if not state["identity_confirmed"]:
-            score += 1.5
-            breakdown.append("Confirmed investor identity")
-            state["identity_confirmed"] = True
-
-    if any(k in t for k in behavior_keywords):
-        score += 0.5
-        breakdown.append("Investment behavior language")
-
-    if any(k in t for k in uae_keywords + mena_keywords):
-        if state["geo_hits"] < 2 and state["identity_confirmed"]:
-            score += 0.3
-            breakdown.append("Supporting geography signal")
-            state["geo_hits"] += 1
-
-    for d in bonus_domains:
-        if d in url and d not in state["domain_hits"]:
-            score += 0.4
-            breakdown.append(f"External confirmation via {d}")
-            breakdown.append("Public contact information likely available")
-            state["domain_hits"].add(d)
-
-    return min(score, 5.0), breakdown, state["identity_confirmed"]
+def is_valid_person_name(name):
+    if not name or len(name.split()) < 2:
+        return False
+    if name.lower() == "angel investor":
+        return False
+    return True
 
 st.subheader("Public Lead Discovery")
-
-st.text("Manual First-Pass Query Input")
 
 query_input = st.text_area(
     "Enter one search query per line",
@@ -210,27 +121,7 @@ max_results_per_query = st.number_input(
     step=1
 )
 
-def is_valid_person_name(name: str) -> bool:
-    if not name:
-        return False
-
-    n = name.lower().strip()
-
-    bad_exact = {
-        "angel investor",
-    }
-
-    if n in bad_exact:
-        return False
-
-    if len(name.split()) < 2:
-        return False
-
-    return True
-
-
 if st.button("Run Discovery") and query_input.strip():
-
     queries = [q.strip() for q in query_input.split("\n") if q.strip()]
 
     with DDGS(timeout=10) as ddgs:
@@ -239,15 +130,13 @@ if st.button("Run Discovery") and query_input.strip():
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
+
                 if not url:
                     continue
 
-                norm_url = normalize_url(url)
-                if any(bad in norm_url for bad in blocked_urls):
+                if any(bad in normalize_url(url) for bad in blocked_urls):
                     continue
 
-                if norm_url in {normalize_url(x["URL"]) for x in st.session_state.results}:
-                    continue
                 combined = f"{title} {snippet}"
                 score, conf, breakdown = score_text(combined, query, url)
                 name = title.split("-")[0].strip()
@@ -266,340 +155,18 @@ if st.button("Run Discovery") and query_input.strip():
                     "Signals": " | ".join(breakdown)
                 })
 
+EXPECTED_COLUMNS = [
+    "Reviewed", "Name", "Title", "Snippet",
+    "URL", "Score", "Confidence", "Signals"
+]
+
 df_first = pd.DataFrame(st.session_state.results)
+
+for col in EXPECTED_COLUMNS:
+    if col not in df_first.columns:
+        df_first[col] = []
+
 st.dataframe(
     df_first[["Reviewed", "Name", "Score", "Confidence", "Signals", "Snippet", "URL"]],
     use_container_width=True
 )
-
-if "Reviewed" not in df_first.columns:
-    df_first["Reviewed"] = False
-
-if "Confidence" not in df_first.columns:
-    df_first["Confidence"] = ""
-
-if "Signals" not in df_first.columns:
-    df_first["Signals"] = ""
-
-st.subheader("Mark Entry as Reviewed")
-
-if not display_df.empty:
-    selected_name = st.selectbox(
-        "Select name to mark as reviewed",
-        display_df["Name"].tolist()
-    )
-
-    if st.button("Mark as Reviewed"):
-        for r in st.session_state.results:
-            if r["Name"] == selected_name:
-                r["Reviewed"] = True
-                break
-
-st.subheader("Mark Entry as Reviewed")
-
-st.subheader("Checklist Helper")
-
-selected_index = st.number_input(
-    "Row number to copy (0-based index)",
-    min_value=0,
-    max_value=max(len(df_first)-1, 0),
-    value=0,
-    step=1
-)
-
-if not df_first.empty:
-    row = df_first.iloc[selected_index]
-    checklist_text = f"""
-RAW TITLE TEXT:
-{row['Title']}
-
-RAW SNIPPET TEXT:
-{row['Snippet']}
-
-QUERY USED:
-(manual)
-
-FINAL SCORE:
-{row['Score']}
-
-SYSTEM CONFIDENCE:
-{row['Confidence']}
-
-TOP CONTRIBUTORS:
-{row['Signals']}
-"""
-    st.text_area("Copy to checklist", checklist_text, height=300)
-
-if not df_first.empty and "Score" in df_first.columns:
-    first_pass_rejects = df_first[df_first["Score"] < 3.8][["Name", "Score"]]
-else:
-    first_pass_rejects = pd.DataFrame(columns=["Name", "Score"])
-
-st.divider()
-st.subheader("Automated Verification Engine")
-
-second_pass_placeholder = st.empty()
-
-if st.button("Run Second Pass"):
-    eligible_rows = df_first[df_first["Score"] >= 3.8]
-    total_names = len(eligible_rows)
-
-    progress = st.progress(0)
-    status = st.empty()
-    second_pass_placeholder.empty()
-
-    processed_names = {x["Name"] for x in st.session_state.second_pass_results}
-
-    with DDGS(timeout=10) as ddgs:
-        for i, (_, row) in enumerate(eligible_rows.iterrows(), start=1):
-            name = row["Name"]
-
-            if name in processed_names:
-                continue
-
-            status.write(f"Verifying identity for {name} ({i}/{total_names})")
-            progress.progress(i / total_names)
-
-            anchors = extract_anchors(row["Snippet"])
-            queries_2 = build_second_pass_queries(name, anchors)
-
-            state = {
-                "linkedin_seen": False,
-                "geo_hits": 0,
-                "identity_confirmed": False,
-                "domain_hits": set()
-            }
-
-            partial_alignment = False
-
-            for idx, q in enumerate(queries_2):
-                if idx == 1 and not partial_alignment:
-                    break
-
-                status.write(f"Querying: {q}")
-
-                try:
-                    results = ddgs.text(q, max_results=20, backend="html")
-                except Exception:
-                    continue
-
-                for r in results:
-                    url = r.get("href", "")
-                    if not url:
-                        continue
-
-                    norm_url = normalize_url(url)
-                    if any(bad in norm_url for bad in blocked_urls):
-                        continue
-
-                    text = f"{r.get('title','')} {r.get('body','')}"
-                    score2, breakdown2, _ = score_second_pass(text, url, state)
-
-                    if score2 > 0:
-                        partial_alignment = True
-                        st.session_state.second_pass_results.append({
-                            "Name": name,
-                            "Query Used": q,
-                            "Snippet": text,
-                            "Second Pass Score": score2,
-                            "Score Breakdown": " | ".join(breakdown2),
-                            "Source URL": url,
-                            "Reviewed": False
-                        })
-
-                        df_live = pd.DataFrame(st.session_state.second_pass_results)
-                        second_pass_placeholder.dataframe(df_live, use_container_width=True)
-
-    progress.empty()
-    status.empty()
-
-df_second = pd.DataFrame(st.session_state.second_pass_results)
-
-if not df_second.empty:
-    st.subheader("Second Pass Verification Results")
-    st.dataframe(
-        df_second.sort_values(
-            by=["Name", "Second Pass Score"],
-            ascending=[True, False]
-        ),
-        use_container_width=True
-    )
-
-if not df_first.empty:
-    consolidated = []
-
-    verified_names = set(df_second["Name"]) if not df_second.empty else set()
-    all_first_pass_names = set(df_first["Name"])
-
-    if not df_second.empty:
-        for name, g in df_second.groupby("Name"):
-            total_raw = g["Second Pass Score"].sum()
-            total = min(total_raw, 6.0)
-
-            investor = "Yes" if any("Confirmed investor identity" in x for x in g["Score Breakdown"]) else "No"
-            uae = "Yes" if any("geography" in x.lower() for x in g["Score Breakdown"]) else "No"
-
-            companies = set()
-            has_rocketreach = False
-
-            snippets = g["Snippet"].tolist()
-            urls = g["Source URL"].tolist()
-
-            for s in snippets:
-                matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
-                for _, company in matches:
-                    companies.add(company.strip())
-
-            for u in urls:
-                if "rocketreach.co" in u:
-                    has_rocketreach = True
-
-            if total >= 4.5:
-                evidence_strength = "Strong"
-            elif total >= 2.5:
-                evidence_strength = "Moderate"
-            else:
-                evidence_strength = "Weak"
-
-            if investor == "Yes" and uae == "Yes" and total >= 4.5:
-                verdict = "ACCEPT"
-            elif total >= 2.5:
-                verdict = "GOOD"
-            else:
-                verdict = "REJECT"
-
-            consolidated.append({
-                "Name": name,
-                "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
-                "Second Pass Total": round(total, 1),
-                "Evidence Rows": len(g),
-                "Investor Confirmed": investor,
-                "UAE Confirmed": uae,
-                "Enriched Company": ", ".join(sorted(companies)),
-                "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
-                "Evidence Strength": evidence_strength,
-                "Final Verdict": verdict
-            })
-
-    pending_names = all_first_pass_names - verified_names
-
-    for name in pending_names:
-        row = df_first[df_first["Name"] == name].iloc[0]
-
-        if row["Score"] >= 3.8:
-            consolidated.append({
-                "Name": name,
-                "First Pass Score": row["Score"],
-                "Second Pass Total": 0.0,
-                "Evidence Rows": 0,
-                "Investor Confirmed": "Pending",
-                "UAE Confirmed": "Pending",
-                "Enriched Company": "",
-                "Enriched Social": "",
-                "Final Verdict": "PENDING"
-            })
-
-    df_consolidated = pd.DataFrame(consolidated)
-
-    verdict_rank = {
-        "ACCEPT": 0,
-        "GOOD": 1,
-        "PENDING": 2,
-        "REJECT": 3
-    }
-
-    df_consolidated["Verdict Rank"] = df_consolidated["Final Verdict"].map(verdict_rank)
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    c1.metric("Leads Discovered", len(df_first))
-    c2.metric("Passed First Filter", len(df_first[df_first["Score"] >= 3.8]))
-    c3.metric("Verified", len(verified_names))
-    c4.metric(
-        "Green List",
-        len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
-    )
-
-    st.subheader("Review List")
-    show_green_only = st.checkbox(
-        "Show Green List only",
-        value=False
-    )
-
-    display_df = df_consolidated
-    if show_green_only:
-        display_df = df_consolidated[
-            df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])
-        ]
-
-    st.dataframe(
-        display_df.sort_values(
-            by=["Verdict Rank", "Second Pass Total"],
-            ascending=[True, False]
-        ).drop(columns=["Verdict Rank"]),
-        use_container_width=True
-    )
-
-    st.metric(
-        "Green List",
-        len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])])
-    )
-
-    st.metric(
-        "Leads Verified",
-        len(verified_names)
-    )
-
-    for _, row in df_consolidated.iterrows():
-        with st.expander(f"{row['Name']} (Verdict: {row['Final Verdict']})"):
-            st.write(
-                "First-Pass Snippet:",
-                df_first[df_first["Name"] == row["Name"]]["Snippet"].values[0]
-            )
-
-            if row["Name"] in verified_names:
-                st.write(
-                    "Verification Evidence:",
-                    df_second[df_second["Name"] == row["Name"]]["Score Breakdown"].tolist()
-                )
-    
-    st.divider()
-    st.subheader("Outreach Feasibility Check")
-
-    if st.button("Run Third Pass Enrichment"):
-        with DDGS(timeout=10) as ddgs:
-            eligible = df_consolidated[df_consolidated["Final Verdict"] != "REJECT"]["Name"].tolist()
-
-            for name in eligible:
-                queries_3 = [
-                    f'site:instagram.com "{name}"',
-                    f'site:x.com "{name}"',
-                    f'site:facebook.com "{name}"',
-                    f'"{name}" email',
-                    f'"{name}" phone'
-                ]
-
-                for q in queries_3:
-                    try:
-                        results = ddgs.text(q, max_results=2, backend="html")
-                    except Exception:
-                        continue
-
-                    for r in results:
-                        url = r.get("href", "")
-                        if not url:
-                            continue
-
-                        norm_url = normalize_url(url)
-                        if any(bad in norm_url for bad in blocked_urls):
-                            continue
-
-                        st.session_state.third_pass_results.append({
-                            "Name": name,
-                            "Query Used": q,
-                            "Snippet": f"{r.get('title','')} {r.get('body','')}",
-                            "Source URL": url
-                        })
-
-    df_third = pd.DataFrame(st.session_state.third_pass_results)
-    st.dataframe(df_third, use_container_width=True)
