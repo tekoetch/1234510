@@ -182,7 +182,7 @@ for col in EXPECTED_COLUMNS:
         df_first[col] = []
 
 st.dataframe(
-    df_first[["Reviewed", "Name", "Score", "Confidence", "Signals", "Snippet", "URL"]],
+    df_first[["Reviewed", "Name", "Title", "Snippet", "Score", "Confidence", "Signals", "URL"]],
     use_container_width=True
 )
 
