@@ -53,14 +53,15 @@ def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
 def score_text(text, query, url=""):
+    breakdown = []
+    signal_groups = set()
+
     if len(text) > 600:
         breakdown.append("Overlong snippet (possible aggregation)")
         text = text[:600]
 
     text = text.lower()
     score = BASE_SCORE
-    breakdown = []
-    signal_groups = set()
 
     identity_hits = [k for k in identity_keywords if k in text]
     if identity_hits:
