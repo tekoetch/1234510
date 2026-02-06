@@ -256,6 +256,7 @@ if st.button("Run Discovery") and query_input.strip():
                     continue
 
                 st.session_state.results.append({
+                    "Reviewed": False,
                     "Name": name,
                     "Title": title,
                     "Snippet": snippet,
