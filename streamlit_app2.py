@@ -49,6 +49,13 @@ blocked_urls = [
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder"}
 
+def is_duplicate_url(url, existing_results):
+    norm = normalize_url(url)
+    for r in existing_results:
+        if normalize_url(r.get("URL", "")) == norm:
+            return True
+    return False
+
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
@@ -149,6 +156,9 @@ if st.button("Run Discovery") and query_input.strip():
                 if not is_valid_person_name(name):
                     continue
 
+                if is_duplicate_url(url, st.session_state.results):
+                    continue
+
                 st.session_state.results.append({
                     "Reviewed": False,
                     "Name": name,
@@ -175,10 +185,6 @@ st.dataframe(
     df_first[["Reviewed", "Name", "Score", "Confidence", "Signals", "Snippet", "URL"]],
     use_container_width=True
 )
-
-# =========================
-# CHECKLIST HELPER (MANUAL REVIEW)
-# =========================
 
 st.subheader("Checklist Helper")
 
