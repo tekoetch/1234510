@@ -273,6 +273,20 @@ st.dataframe(
 
 st.subheader("Mark Entry as Reviewed")
 
+if not display_df.empty:
+    selected_name = st.selectbox(
+        "Select name to mark as reviewed",
+        display_df["Name"].tolist()
+    )
+
+    if st.button("Mark as Reviewed"):
+        for r in st.session_state.results:
+            if r["Name"] == selected_name:
+                r["Reviewed"] = True
+                break
+
+st.subheader("Mark Entry as Reviewed")
+
 st.subheader("Checklist Helper")
 
 selected_index = st.number_input(
