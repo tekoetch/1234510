@@ -175,3 +175,72 @@ st.dataframe(
     df_first[["Reviewed", "Name", "Score", "Confidence", "Signals", "Snippet", "URL"]],
     use_container_width=True
 )
+
+# =========================
+# CHECKLIST HELPER (MANUAL REVIEW)
+# =========================
+
+st.subheader("Checklist Helper")
+
+if df_first.empty:
+    st.info("No rows available yet.")
+else:
+    selected_index = st.number_input(
+        "Row number to copy (0-based index)",
+        min_value=0,
+        max_value=len(df_first) - 1,
+        value=0,
+        step=1
+    )
+
+    row = df_first.iloc[selected_index]
+
+    checklist_text = f"""
+-----------------------------------------------
+RAW TITLE TEXT (VERBATIM):
+{row.get('Title', '')}
+
+RAW SNIPPET TEXT (VERBATIM):
+{row.get('Snippet', '')}
+
+SEARCH MODE (QUOTED / UNQUOTED):
+
+QUERY USED:
+(manual)
+
+NAME COMMONALITY (RARE / MODERATE / VERY COMMON, multiple linkedin profile with similar name, chance of false positive in second pass):
+
+FINAL SCORE:
+{row.get('Score', '')}
+
+SYSTEM CONFIDENCE (LOW / MEDIUM / HIGH, should they move on to second pass?):
+{row.get('Confidence', '')}
+
+TOP CONTRIBUTORS (exact keywords or signals that boosted score):
+{row.get('Signals', '')}
+
+YOUR VERDICT (REJECT / SECOND PASS OK / CLEARLY GOOD):
+
+SNIPPET ALONE FELT SUFFICIENT TO DECIDE? (YES / NO):
+
+IF SCORE WERE 0.2 LOWER, WOULD YOU STILL KEEP IT? (YES / NO):
+
+DID YOU FEEL THE NEED TO CLICK A PROFILE? (YES / NO):
+
+IF YES, WHY? (ambiguity / role unclear / geography unclear / seniority unclear / other):
+
+FALSE-POSITIVE RISK (LOW / MEDIUM / HIGH):
+
+MISSING-BUT-OBVIOUS SIGNAL (OPTIONAL):
+
+EDGE-CASE TYPE (if any):
+(common name / inflated title / geography mismatch / keyword bait / unclear investor type / other):
+
+NOTES (OPTIONAL, is role explicit and suggest influence capital or decision authority, any signals here the person invests or allocates capital or advises on investments, anything unique that stands out):
+"""
+
+    st.text_area(
+        "Copy into your checklist",
+        checklist_text,
+        height=500
+    )
