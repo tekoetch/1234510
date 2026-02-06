@@ -66,6 +66,10 @@ def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
 def score_text(text, query, url=""):
+    if len(text) > 600:
+        breakdown.append("Overlong snippet (possible aggregation)")
+        text = text[:600]
+
     text = text.lower()
     query = query.lower()
     score = BASE_SCORE
@@ -190,10 +194,21 @@ def score_second_pass(text, url, state):
 
 st.subheader("Public Lead Discovery")
 
-queries = [
-    '"angel investor" UAE site:linkedin.com/in',
-    'angel investor "UAE" site:linkedin.com/in'
-]
+st.text("Manual First-Pass Query Input")
+
+query_input = st.text_area(
+    "Enter one search query per line",
+    height=120,
+    placeholder='"angel investor" UAE site:linkedin.com/in'
+)
+
+max_results_per_query = st.number_input(
+    "Results per query",
+    min_value=1,
+    max_value=50,
+    value=10,
+    step=1
+)
 
 def is_valid_person_name(name: str) -> bool:
     if not name:
@@ -214,10 +229,13 @@ def is_valid_person_name(name: str) -> bool:
     return True
 
 
-if st.button("Run Discovery"):
+if st.button("Run Discovery") and query_input.strip():
+
+    queries = [q.strip() for q in query_input.split("\n") if q.strip()]
+
     with DDGS(timeout=10) as ddgs:
         for query in queries:
-            for r in ddgs.text(query, max_results=10, backend="html"):
+            for r in ddgs.text(query, max_results=max_results_per_query, backend="lite"):
                 title = r.get("title", "")
                 snippet = r.get("body", "")
                 url = r.get("href", "")
@@ -248,7 +266,45 @@ if st.button("Run Discovery"):
                 })
 
 df_first = pd.DataFrame(st.session_state.results)
-st.dataframe(df_first, use_container_width=True)
+st.dataframe(
+    df_first[["Reviewed", "Name", "Score", "Confidence", "Signals", "Snippet", "URL"]],
+    use_container_width=True
+)
+
+st.subheader("Mark Entry as Reviewed")
+
+st.subheader("Checklist Helper")
+
+selected_index = st.number_input(
+    "Row number to copy (0-based index)",
+    min_value=0,
+    max_value=max(len(df_first)-1, 0),
+    value=0,
+    step=1
+)
+
+if not df_first.empty:
+    row = df_first.iloc[selected_index]
+    checklist_text = f"""
+RAW TITLE TEXT:
+{row['Title']}
+
+RAW SNIPPET TEXT:
+{row['Snippet']}
+
+QUERY USED:
+(manual)
+
+FINAL SCORE:
+{row['Score']}
+
+SYSTEM CONFIDENCE:
+{row['Confidence']}
+
+TOP CONTRIBUTORS:
+{row['Signals']}
+"""
+    st.text_area("Copy to checklist", checklist_text, height=300)
 
 if not df_first.empty and "Score" in df_first.columns:
     first_pass_rejects = df_first[df_first["Score"] < 3.8][["Name", "Score"]]
@@ -323,7 +379,8 @@ if st.button("Run Second Pass"):
                             "Snippet": text,
                             "Second Pass Score": score2,
                             "Score Breakdown": " | ".join(breakdown2),
-                            "Source URL": url
+                            "Source URL": url,
+                            "Reviewed": False
                         })
 
                         df_live = pd.DataFrame(st.session_state.second_pass_results)
