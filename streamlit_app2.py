@@ -272,6 +272,15 @@ st.dataframe(
     use_container_width=True
 )
 
+if "Reviewed" not in df_first.columns:
+    df_first["Reviewed"] = False
+
+if "Confidence" not in df_first.columns:
+    df_first["Confidence"] = ""
+
+if "Signals" not in df_first.columns:
+    df_first["Signals"] = ""
+
 st.subheader("Mark Entry as Reviewed")
 
 if not display_df.empty:
