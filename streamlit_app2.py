@@ -2,14 +2,9 @@ import streamlit as st
 from ddgs import DDGS
 import pandas as pd
 import re
-import requests
-import time
 
 if "results" not in st.session_state:
     st.session_state.results = []
-
-if "searxng_results" not in st.session_state:
-    st.session_state.searxng_results = []
 
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Leads Discovery")
@@ -73,6 +68,7 @@ def soft_truncate_ellipsis(text: str) -> str:
         return text.split("...")[0].strip()
     return text
 
+
 def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
@@ -120,7 +116,7 @@ def score_text(text, query, url=""):
 
     if "ae.linkedin.com/in" in url:
         score += GEO_GROUP_BONUS
-        breakdown.append("UAE LinkedIn domain")
+        breakdown.append("UAE LinkedIn domain")    
 
     score = min(score, 10.0)
     confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
@@ -205,105 +201,6 @@ for col in EXPECTED_COLUMNS:
 
 st.dataframe(
     df_first[["Reviewed", "Name", "Title", "Snippet", "Score", "Confidence", "Signals", "URL"]],
-    use_container_width=True
-)
-
-st.subheader("Public Lead Discovery (SearxNG)")
-
-searxng_max_results = st.number_input(
-    "Results per query (SearxNG)",
-    min_value=1,
-    max_value=50,
-    value=10,
-    step=1,
-    key="searxng_results_limit"
-)
-
-SEARXNG_INSTANCES = [
-    "https://search.mdosch.de"
-]
-
-def searxng_search(query, max_results):
-    for base_url in SEARXNG_INSTANCES:
-        try:
-            params = {
-                "q": query,
-                "format": "json",
-                "language": "en",
-                "safesearch": 0
-            }
-            r = requests.get(f"{base_url}/search", params=params, timeout=10)
-
-            st.write("SearxNG status:", r.status_code)
-            st.write("SearxNG raw text (first 300 chars):", r.text[:300])
-
-            if r.status_code != 200:
-                continue
-
-            data = r.json()
-            st.write("SearxNG keys:", list(data.keys()))
-
-            results = data.get("results", [])
-            st.write("SearxNG results count:", len(results))
-
-            return results[:max_results]
-
-        except Exception as e:
-            st.write("SearxNG exception:", e)
-            continue
-
-    return []
-
-if st.button("Run Discovery (SearxNG)") and query_input.strip():
-    queries = [q.strip() for q in query_input.split("\n") if q.strip()]
-
-    for query in queries:
-        results = searxng_search(query, searxng_max_results)
-        time.sleep(1)
-
-        for r in results:
-            raw_title = r.get("title", "")
-            raw_snippet = r.get("content", "")
-            url = r.get("url", "")
-
-            title = soft_truncate_ellipsis(raw_title)
-            snippet = soft_truncate_ellipsis(raw_snippet)
-
-            if not url:
-                continue
-
-            if any(bad in normalize_url(url) for bad in blocked_urls):
-                continue
-
-            combined = f"{title} {snippet}"
-            score, conf, breakdown = score_text(combined, query, url)
-            name = title.split("-")[0].strip()
-
-            if not is_valid_person_name(name):
-                continue
-
-            if is_duplicate_url(url, st.session_state.searxng_results):
-                continue
-
-            st.session_state.searxng_results.append({
-                "Reviewed": False,
-                "Name": name,
-                "Title": title,
-                "Snippet": snippet,
-                "URL": url,
-                "Score": score,
-                "Confidence": conf,
-                "Signals": " | ".join(breakdown)
-            })
-
-df_searx = pd.DataFrame(st.session_state.searxng_results)
-
-for col in EXPECTED_COLUMNS:
-    if col not in df_searx.columns:
-        df_searx[col] = []
-
-st.dataframe(
-    df_searx[["Reviewed", "Name", "Title", "Snippet", "Score", "Confidence", "Signals", "URL"]],
     use_container_width=True
 )
 
