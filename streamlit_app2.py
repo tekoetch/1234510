@@ -73,9 +73,11 @@ def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
 
-    if len(text) > 600:
-        breakdown.append("Overlong snippet (possible aggregation)")
-        text = text[:600]
+    location_match = re.search(r"location:\s*([^\n|·]+)", text)
+    if location_match:
+        loc = location_match.group(1)
+        if not any(k in loc for k in uae_keywords + mena_keywords):
+            return 0.0, "Low", ["Hard reject: explicit non-UAE/MENA location"]    
 
     text = text.lower()
     score = BASE_SCORE
