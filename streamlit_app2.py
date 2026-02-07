@@ -2,9 +2,14 @@ import streamlit as st
 from ddgs import DDGS
 import pandas as pd
 import re
+import requests
+import time
 
 if "results" not in st.session_state:
     st.session_state.results = []
+
+if "searxng_results" not in st.session_state:
+    st.session_state.searxng_results = []
 
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Leads Discovery")
@@ -30,7 +35,9 @@ identity_keywords = [
 
 behavior_keywords = [
     "invested in", "investing in", "portfolio",
-    "seed", "pre-seed", "early-stage", "funding"
+    "seed", "pre-seed", "early-stage", "funding",
+    "venture capital", "private equity", "real estate",
+    "fundraising", "investment portfolio", "wealth funds"
 ]
 
 seniority_keywords = [
@@ -58,6 +65,13 @@ def is_duplicate_url(url, existing_results):
 
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
+
+def soft_truncate_ellipsis(text: str) -> str:
+    if not text:
+        return text
+    if "..." in text:
+        return text.split("...")[0].strip()
+    return text
 
 def score_text(text, query, url=""):
     breakdown = []
@@ -104,6 +118,10 @@ def score_text(text, query, url=""):
         score += GEO_GROUP_BONUS
         breakdown.append(f"Geography group bonus (+{GEO_GROUP_BONUS})")
 
+    if "ae.linkedin.com/in" in url:
+        score += GEO_GROUP_BONUS
+        breakdown.append("UAE LinkedIn domain")
+
     score = min(score, 10.0)
     confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
     breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
@@ -139,8 +157,12 @@ if st.button("Run Discovery") and query_input.strip():
     with DDGS(timeout=10) as ddgs:
         for query in queries:
             for r in ddgs.text(query, max_results=max_results_per_query, backend="lite"):
-                title = r.get("title", "")
-                snippet = r.get("body", "")
+                raw_title = r.get("title", "")
+                raw_snippet = r.get("body", "")
+
+                title = soft_truncate_ellipsis(raw_title)
+                snippet = soft_truncate_ellipsis(raw_snippet)
+
                 url = r.get("href", "")
 
                 if not url:
@@ -183,6 +205,93 @@ for col in EXPECTED_COLUMNS:
 
 st.dataframe(
     df_first[["Reviewed", "Name", "Title", "Snippet", "Score", "Confidence", "Signals", "URL"]],
+    use_container_width=True
+)
+
+st.subheader("Public Lead Discovery (SearxNG)")
+
+searxng_max_results = st.number_input(
+    "Results per query (SearxNG)",
+    min_value=1,
+    max_value=50,
+    value=10,
+    step=1,
+    key="searxng_results_limit"
+)
+
+SEARXNG_INSTANCES = [
+    "https://searx.be",
+    "https://searx.tiekoetter.com",
+]
+
+def searxng_search(query, max_results):
+    for base_url in SEARXNG_INSTANCES:
+        try:
+            params = {
+                "q": query,
+                "format": "json",
+                "language": "en",
+                "safesearch": 0
+            }
+            r = requests.get(f"{base_url}/search", params=params, timeout=10)
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            return data.get("results", [])[:max_results]
+        except Exception:
+            continue
+    return []
+
+if st.button("Run Discovery (SearxNG)") and query_input.strip():
+    queries = [q.strip() for q in query_input.split("\n") if q.strip()]
+
+    for query in queries:
+        results = searxng_search(query, searxng_max_results)
+        time.sleep(1)
+
+        for r in results:
+            raw_title = r.get("title", "")
+            raw_snippet = r.get("content", "")
+            url = r.get("url", "")
+
+            title = soft_truncate_ellipsis(raw_title)
+            snippet = soft_truncate_ellipsis(raw_snippet)
+
+            if not url:
+                continue
+
+            if any(bad in normalize_url(url) for bad in blocked_urls):
+                continue
+
+            combined = f"{title} {snippet}"
+            score, conf, breakdown = score_text(combined, query, url)
+            name = title.split("-")[0].strip()
+
+            if not is_valid_person_name(name):
+                continue
+
+            if is_duplicate_url(url, st.session_state.searxng_results):
+                continue
+
+            st.session_state.searxng_results.append({
+                "Reviewed": False,
+                "Name": name,
+                "Title": title,
+                "Snippet": snippet,
+                "URL": url,
+                "Score": score,
+                "Confidence": conf,
+                "Signals": " | ".join(breakdown)
+            })
+
+df_searx = pd.DataFrame(st.session_state.searxng_results)
+
+for col in EXPECTED_COLUMNS:
+    if col not in df_searx.columns:
+        df_searx[col] = []
+
+st.dataframe(
+    df_searx[["Reviewed", "Name", "Title", "Snippet", "Score", "Confidence", "Signals", "URL"]],
     use_container_width=True
 )
 
