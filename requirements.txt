@@ -1,6 +1,7 @@
 streamlit
 pandas
 ddgs
+requests
 st-gsheets-connection
 gspread
 google-auth
