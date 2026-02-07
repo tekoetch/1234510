@@ -228,7 +228,7 @@ def searxng_search(query, max_results):
         try:
             params = {
                 "q": query,
-                "format": "json",
+                "format": "html",
                 "language": "en",
                 "safesearch": 0
             }
