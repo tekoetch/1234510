@@ -233,12 +233,25 @@ def searxng_search(query, max_results):
                 "safesearch": 0
             }
             r = requests.get(f"{base_url}/search", params=params, timeout=10)
+
+            st.write("SearxNG status:", r.status_code)
+            st.write("SearxNG raw text (first 300 chars):", r.text[:300])
+
             if r.status_code != 200:
                 continue
+
             data = r.json()
-            return data.get("results", [])[:max_results]
-        except Exception:
+            st.write("SearxNG keys:", list(data.keys()))
+
+            results = data.get("results", [])
+            st.write("SearxNG results count:", len(results))
+
+            return results[:max_results]
+
+        except Exception as e:
+            st.write("SearxNG exception:", e)
             continue
+
     return []
 
 if st.button("Run Discovery (SearxNG)") and query_input.strip():
