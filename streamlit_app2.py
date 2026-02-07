@@ -220,8 +220,7 @@ searxng_max_results = st.number_input(
 )
 
 SEARXNG_INSTANCES = [
-    "https://searx.be",
-    "https://searx.tiekoetter.com",
+    "https://searx.tiekoetter.com"
 ]
 
 def searxng_search(query, max_results):
