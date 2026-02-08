@@ -84,7 +84,7 @@ def score_text(text, query, url=""):
     hashtags = re.findall(r'#(\w+)', text.lower())
     hashtag_hits = []
 
-    HASHTAG_MULTIPLIER = 0.5  # hashtags are weaker evidence than prose
+    HASHTAG_MULTIPLIER = 1.0
 
     for tag in hashtags:
         tag_text = tag.replace("_", " ")
@@ -92,25 +92,25 @@ def score_text(text, query, url=""):
         if tag_text in identity_keywords:
             boost = IDENTITY_WEIGHT * HASHTAG_MULTIPLIER
             score += boost
-            hashtag_hits.append(f"#{tag} → identity (+{round(boost,1)})")
+            hashtag_hits.append(f"#{tag} = identity (+{round(boost,1)})")
             signal_groups.add("Identity")
 
         elif tag_text in behavior_keywords:
             boost = BEHAVIOR_WEIGHT * HASHTAG_MULTIPLIER
             score += boost
-            hashtag_hits.append(f"#{tag} → behavior (+{round(boost,1)})")
+            hashtag_hits.append(f"#{tag} = behavior (+{round(boost,1)})")
             signal_groups.add("Behavior")
 
         elif tag_text in seniority_keywords:
             boost = SENIORITY_WEIGHT * HASHTAG_MULTIPLIER
             score += boost
-            hashtag_hits.append(f"#{tag} → seniority (+{round(boost,1)})")
+            hashtag_hits.append(f"#{tag} = seniority (+{round(boost,1)})")
             signal_groups.add("Seniority")
 
         elif tag_text in uae_keywords + mena_keywords:
             boost = GEO_GROUP_BONUS * HASHTAG_MULTIPLIER
             score += boost
-            hashtag_hits.append(f"#{tag} → geography (+{round(boost,1)})")
+            hashtag_hits.append(f"#{tag} = geography (+{round(boost,1)})")
             signal_groups.add("Geography")
 
     if hashtag_hits:
