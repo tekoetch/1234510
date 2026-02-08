@@ -78,6 +78,7 @@ def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
 
+    text_original = text
     text = text.lower()
     score = BASE_SCORE
 
@@ -160,21 +161,23 @@ def score_text(text, query, url=""):
     # -------------------------
 
     # Reconstruct a capitalized source (DO NOT use lowercased text)
-    capital_text = f"{query} {url}"
-
+    capital_text = text_original
     company_candidates = []
 
-    # STRONG Pattern 1: Founder / C-level at Company
     company_candidates.extend(re.findall(
-        r'\b(?:founder|cofounder|ceo|cto|cfo|director|partner)\s+(?:at|@)\s+([A-Z][A-Za-z0-9 &\.\-]{2,40})',
-        capital_text,
+        r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner)\b'
+        r'(?:\s*&\s*\w+)?'
+        r'\s+(?:at|@|of)\s+'
+        r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_original,
         re.IGNORECASE
     ))
 
-    # STRONG Pattern 2: Founder / C-level of Company
+    # Venture-style phrasing
     company_candidates.extend(re.findall(
-        r'\b(?:founder|cofounder|ceo|cto|cfo|director|partner)\s+of\s+([A-Z][A-Za-z0-9 &\.\-]{2,40})',
-        capital_text,
+        r'\b(?:started|founded)\s+(?:the\s+)?(?:own\s+)?(?:venture|company|startup)?\s*(?:of|called)?\s*[‘"\']?'
+        r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_original,
         re.IGNORECASE
     ))
 
@@ -195,7 +198,7 @@ def score_text(text, query, url=""):
             continue
         if any(bad in comp_lower for bad in stop_phrases):
             continue
-        if re.search(r"\d", comp_clean):
+        if re.search(r"\d+", comp_clean):
             continue
 
         cleaned_companies.append(comp_clean)
