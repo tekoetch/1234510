@@ -51,12 +51,16 @@ blocked_urls = [
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder"}
 
-def is_duplicate_url(url, existing_results):
+def is_duplicate_url(url, existing_results, title, snippet):
     norm = normalize_url(url)
     for r in existing_results:
         if normalize_url(r.get("URL", "")) == norm:
-            return True
+            old_text = (r.get("Title","") + r.get("Snippet","")).lower()
+            new_text = (title + snippet).lower()
+            if len(set(new_text.split()) - set(old_text.split())) < 5:
+                return True
     return False
+
 
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
@@ -127,11 +131,22 @@ def score_text(text, query, url=""):
     return score, confidence, breakdown
 
 def is_valid_person_name(name):
-    if not name or len(name.split()) < 2:
+    if not name:
         return False
-    if name.lower() == "angel investor":
+    if len(name.split()) < 2:
+        return True
+    if name.lower() in {"angel investor", "venture capital"}:
         return False
     return True
+
+
+def extract_name(title):
+    for sep in [" - ", " | ", " – ", " — "]:
+        if sep in title:
+            candidate = title.split(sep)[0].strip()
+            return candidate
+    return title.strip()
+
 
 st.subheader("Public Lead Discovery")
 
@@ -171,12 +186,12 @@ if st.button("Run Discovery") and query_input.strip():
 
                 combined = f"{title} {snippet}"
                 score, conf, breakdown = score_text(combined, query, url)
-                name = title.split("-")[0].strip()
+                name = extract_name(title)
 
                 if not is_valid_person_name(name):
                     continue
 
-                if is_duplicate_url(url, st.session_state.results):
+                if is_duplicate_url(url, st.session_state.results, title, snippet):
                     continue
 
                 st.session_state.results.append({
