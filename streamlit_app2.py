@@ -9,14 +9,14 @@ if "results" not in st.session_state:
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Leads Discovery")
 
-BASE_SCORE = 1.5
-IDENTITY_WEIGHT = 1.8
+BASE_SCORE = 2.0
+IDENTITY_WEIGHT = 2.5
 IDENTITY_DIMINISHING_WEIGHT = 0.8
 BEHAVIOR_WEIGHT = 0.4
 BEHAVIOR_GROUP_BONUS = 0.5
 SENIORITY_WEIGHT = 1.0
 SENIORITY_GROUP_BONUS = 0.5
-GEO_GROUP_BONUS = 0.5
+GEO_GROUP_BONUS = 0.6
 
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -155,6 +155,13 @@ def score_text(text, query, url=""):
         breakdown.append(f"Seniority group bonus (+{SENIORITY_GROUP_BONUS})")
         signal_groups.add("Seniority")
 
+    company_names = re.findall(r'\b(?:at|with|CEO of|CTO of|founder of)\s+([A-Z][A-Za-z0-9][A-Za-z0-9 &\.]{2,30})', text, re.IGNORECASE)
+    enriched_company = ""
+    if company_names:
+        enriched_company = company_names[0].strip()
+        score += 0.3
+        breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
+
     geo_boost = 0
     if any(k in text for k in uae_keywords + mena_keywords):
         signal_groups.add("Geography")
@@ -179,7 +186,7 @@ def score_text(text, query, url=""):
     confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
     breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
 
-    return score, confidence, breakdown
+    return score, confidence, breakdown, enriched_company
 
 def is_valid_person_name(name):
     if not name:
@@ -242,7 +249,7 @@ if st.button("Run Discovery") and query_input.strip():
                     continue
 
                 combined = f"{title} {snippet}"
-                score, conf, breakdown = score_text(combined, query, url)
+                score, conf, breakdown, enriched_company = score_text(combined, query, url)
                 name = extract_name(title)
 
                 if not is_valid_person_name(name):
@@ -275,12 +282,13 @@ if st.button("Run Discovery") and query_input.strip():
                         "URL": url,
                         "Score": score,
                         "Confidence": conf,
-                        "Signals": " | ".join(breakdown)
+                        "Signals": " | ".join(breakdown),
+                        "Enriched Company": enriched_company
                     })
 
 EXPECTED_COLUMNS = [
     "Reviewed", "Name", "Title", "Snippet",
-    "URL", "Score", "Confidence", "Signals"
+    "URL", "Score", "Confidence", "Signals", "Enriched Company"
 ]
 
 df_first = pd.DataFrame(st.session_state.results)
