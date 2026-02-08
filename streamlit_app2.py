@@ -81,7 +81,7 @@ def score_text(text, query, url=""):
     if location_match:
         loc = location_match.group(1).lower()
         if any(k in loc for k in uae_keywords + mena_keywords):
-            score += 0.5
+            score += GEO_GROUP_BONUS
             breakdown.append("Explicit UAE location (+0.5)")
         elif any(bad in loc for bad in ["london", "singapore", "new york", "usa", "uk", "india"]):
             score -= 1.5 
