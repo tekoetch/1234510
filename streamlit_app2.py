@@ -155,10 +155,57 @@ def score_text(text, query, url=""):
         breakdown.append(f"Seniority group bonus (+{SENIORITY_GROUP_BONUS})")
         signal_groups.add("Seniority")
 
-    company_names = re.findall(r'\b(?:at|with|CEO of|CTO of|founder of)\s+([A-Z][A-Za-z0-9][A-Za-z0-9 &\.]{2,30})', text, re.IGNORECASE)
+    # -------------------------
+    # Company enrichment (robust)
+    # -------------------------
+
+    # Reconstruct a capitalized source (DO NOT use lowercased text)
+    capital_text = f"{query} {url}"
+
+    company_candidates = []
+
+    # STRONG Pattern 1: Founder / C-level at Company
+    company_candidates.extend(re.findall(
+        r'\b(?:founder|cofounder|ceo|cto|cfo|director|partner)\s+(?:at|@)\s+([A-Z][A-Za-z0-9 &\.\-]{2,40})',
+        capital_text,
+        re.IGNORECASE
+    ))
+
+    # STRONG Pattern 2: Founder / C-level of Company
+    company_candidates.extend(re.findall(
+        r'\b(?:founder|cofounder|ceo|cto|cfo|director|partner)\s+of\s+([A-Z][A-Za-z0-9 &\.\-]{2,40})',
+        capital_text,
+        re.IGNORECASE
+    ))
+
+    # -------------------------
+    # Cleaning & validation
+    # -------------------------
+    stop_phrases = [
+        "years of", "experience", "worked with", "experience in",
+        "services", "solutions", "expansion", "linkedin"
+    ]
+
+    cleaned_companies = []
+    for comp in company_candidates:
+        comp_clean = comp.strip(" .,-·")
+        comp_lower = comp_clean.lower()
+
+        if len(comp_clean) < 3:
+            continue
+        if any(bad in comp_lower for bad in stop_phrases):
+            continue
+        if re.search(r"\d", comp_clean):
+            continue
+
+        cleaned_companies.append(comp_clean)
+
+    # Deduplicate while preserving order
+    cleaned_companies = list(dict.fromkeys(cleaned_companies))
+
     enriched_company = ""
-    if company_names:
-        enriched_company = company_names[0].strip()
+    if cleaned_companies:
+        enriched_company = cleaned_companies[0]
         score += 0.3
         breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
 
