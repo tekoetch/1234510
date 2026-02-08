@@ -191,6 +191,14 @@ if st.button("Run Discovery") and query_input.strip():
                 if any(bad in normalize_url(url) for bad in blocked_urls):
                     continue
 
+                if is_duplicate_url(
+                    url,
+                    st.session_state.results,
+                    title,
+                    snippet
+                ):
+                    continue
+
                 combined = f"{title} {snippet}"
                 score, conf, breakdown = score_text(combined, query, url)
                 name = extract_name(title)
@@ -227,17 +235,6 @@ if st.button("Run Discovery") and query_input.strip():
                         "Confidence": conf,
                         "Signals": " | ".join(breakdown)
                     })
-
-                st.session_state.results.append({
-                    "Reviewed": False,
-                    "Name": name,
-                    "Title": title,
-                    "Snippet": snippet,
-                    "URL": url,
-                    "Score": score,
-                    "Confidence": conf,
-                    "Signals": " | ".join(breakdown)
-                })
 
 EXPECTED_COLUMNS = [
     "Reviewed", "Name", "Title", "Snippet",
