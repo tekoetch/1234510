@@ -9,18 +9,14 @@ if "results" not in st.session_state:
 st.set_page_config(page_title="Leads Dashboard", layout="wide")
 st.title("Leads Discovery")
 
-freeze_scoring = st.toggle("Freeze scoring (manual)", value=False)
-
-st.sidebar.header("Scoring Controls")
-
-BASE_SCORE = st.sidebar.slider("Base score (query baseline)", 0.0, 3.0, 1.5, 0.1)
-IDENTITY_WEIGHT = st.sidebar.slider("Primary identity boost", 0.5, 3.0, 1.8, 0.1)
-IDENTITY_DIMINISHING_WEIGHT = st.sidebar.slider("Additional identity boost", 0.2, 1.5, 0.8, 0.1)
-BEHAVIOR_WEIGHT = st.sidebar.slider("Behavior keyword boost", 0.1, 2.0, 0.4, 0.1)
-BEHAVIOR_GROUP_BONUS = st.sidebar.slider("Identity + behavior synergy bonus", 0.0, 1.0, 0.5, 0.1)
-SENIORITY_WEIGHT = st.sidebar.slider("Seniority keyword boost", 0.2, 3.0, 1.0, 0.1)
-SENIORITY_GROUP_BONUS = st.sidebar.slider("Seniority group bonus", 0.0, 1.0, 0.5, 0.1)
-GEO_GROUP_BONUS = st.sidebar.slider("Geography group bonus", 0.0, 1.0, 0.5, 0.1)
+BASE_SCORE = 1.5
+IDENTITY_WEIGHT = 1.8
+IDENTITY_DIMINISHING_WEIGHT = 0.8
+BEHAVIOR_WEIGHT = 0.4
+BEHAVIOR_GROUP_BONUS = 0.5
+SENIORITY_WEIGHT = 1.0
+SENIORITY_GROUP_BONUS = 0.5
+GEO_GROUP_BONUS = 0.5
 
 identity_keywords = [
     "angel investor", "angel investing", "family office",
@@ -85,6 +81,15 @@ def score_text(text, query, url=""):
     text = text.lower()
     score = BASE_SCORE
 
+    hashtag_boost = 0
+    hashtags = re.findall(r'#(\w+)', text)
+    for tag in hashtags:
+        tag_lower = tag.lower()
+        if tag_lower in ['vc', 'venture', 'investment', 'investor', 'funding', 'startup', 'mena', 'gcc', 'uae', 'dubai']:
+            hashtag_boost += 0.3
+    breakdown.append(f"Hashtag signals: {', '.join(['#' + t for t in hashtags])} (+{round(hashtag_boost, 1)})")
+    score += min(hashtag_boost, 1.8)
+
     location_match = re.search(r"location:\s*([^\n|·]+)", text, re.IGNORECASE)
     if location_match:
         loc = location_match.group(1).lower()
@@ -124,16 +129,27 @@ def score_text(text, query, url=""):
         breakdown.append(f"Seniority group bonus (+{SENIORITY_GROUP_BONUS})")
         signal_groups.add("Seniority")
 
+    geo_boost = 0
     if any(k in text for k in uae_keywords + mena_keywords):
         signal_groups.add("Geography")
-        score += GEO_GROUP_BONUS
-        breakdown.append(f"Geography group bonus (+{GEO_GROUP_BONUS})")
+        geo_boost += GEO_GROUP_BONUS
+        
+        if "dubai" in text or "abu dhabi" in text:
+            geo_boost += 0.3
+            breakdown.append("Explicit UAE city mentioned")
+        
+        breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
+        score += geo_boost
 
     if "ae.linkedin.com/in" in url:
         score += GEO_GROUP_BONUS
-        breakdown.append("UAE LinkedIn domain")    
+        breakdown.append("UAE LinkedIn domain")
+    elif score >= 5.0 and "Geography" not in signal_groups:
+        score -= 0.5
+        breakdown.append("High score without geography confirmation")
+   
+    score = max(0.0, min(score, 10.0))
 
-    score = min(score, 10.0)
     confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
     breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
 
