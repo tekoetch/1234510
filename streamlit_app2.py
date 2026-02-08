@@ -61,7 +61,6 @@ def is_duplicate_url(url, existing_results, title, snippet):
                 return True
     return False
 
-
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
 
@@ -72,6 +71,12 @@ def soft_truncate_ellipsis(text: str) -> str:
         return text.split("...")[0].strip()
     return text
 
+def find_existing_person(url, existing_results):
+    norm = normalize_url(url)
+    for i, r in enumerate(existing_results):
+        if normalize_url(r.get("URL", "")) == norm:
+            return i
+    return None
 
 def score_text(text, query, url=""):
     breakdown = []
@@ -143,14 +148,12 @@ def is_valid_person_name(name):
         return False
     return True
 
-
 def extract_name(title):
     for sep in [" - ", " | ", " – ", " — "]:
         if sep in title:
             candidate = title.split(sep)[0].strip()
             return candidate
     return title.strip()
-
 
 st.subheader("Public Lead Discovery")
 
@@ -195,8 +198,35 @@ if st.button("Run Discovery") and query_input.strip():
                 if not is_valid_person_name(name):
                     continue
 
-                if is_duplicate_url(url, st.session_state.results, title, snippet):
-                    continue
+                existing_idx = find_existing_person(url, st.session_state.results)
+
+                if existing_idx is not None:
+                    existing = st.session_state.results[existing_idx]
+
+                    existing["Snippet"] += "\n---\n" + snippet
+                    existing["Title"] = existing["Title"]
+                    existing["Score"] = max(existing["Score"], score)
+
+                    old_signals = set(existing["Signals"].split(" | "))
+                    new_signals = set(breakdown)
+                    existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
+
+                    if conf == "High":
+                        existing["Confidence"] = "High"
+                    elif conf == "Medium" and existing["Confidence"] == "Low":
+                        existing["Confidence"] = "Medium"
+
+                else:
+                    st.session_state.results.append({
+                        "Reviewed": False,
+                        "Name": name,
+                        "Title": title,
+                        "Snippet": snippet,
+                        "URL": url,
+                        "Score": score,
+                        "Confidence": conf,
+                        "Signals": " | ".join(breakdown)
+                    })
 
                 st.session_state.results.append({
                     "Reviewed": False,
