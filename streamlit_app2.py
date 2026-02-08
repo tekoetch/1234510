@@ -81,14 +81,40 @@ def score_text(text, query, url=""):
     text = text.lower()
     score = BASE_SCORE
 
-    hashtag_boost = 0
-    hashtags = re.findall(r'#(\w+)', text)
+    hashtags = re.findall(r'#(\w+)', text.lower())
+    hashtag_hits = []
+
+    HASHTAG_MULTIPLIER = 0.5  # hashtags are weaker evidence than prose
+
     for tag in hashtags:
-        tag_lower = tag.lower()
-        if tag_lower in ['vc', 'venture', 'investment', 'investor', 'funding', 'startup', 'mena', 'gcc', 'uae', 'dubai']:
-            hashtag_boost += 0.3
-    breakdown.append(f"Hashtag signals: {', '.join(['#' + t for t in hashtags])} (+{round(hashtag_boost, 1)})")
-    score += min(hashtag_boost, 1.8)
+        tag_text = tag.replace("_", " ")
+
+        if tag_text in identity_keywords:
+            boost = IDENTITY_WEIGHT * HASHTAG_MULTIPLIER
+            score += boost
+            hashtag_hits.append(f"#{tag} → identity (+{round(boost,1)})")
+            signal_groups.add("Identity")
+
+        elif tag_text in behavior_keywords:
+            boost = BEHAVIOR_WEIGHT * HASHTAG_MULTIPLIER
+            score += boost
+            hashtag_hits.append(f"#{tag} → behavior (+{round(boost,1)})")
+            signal_groups.add("Behavior")
+
+        elif tag_text in seniority_keywords:
+            boost = SENIORITY_WEIGHT * HASHTAG_MULTIPLIER
+            score += boost
+            hashtag_hits.append(f"#{tag} → seniority (+{round(boost,1)})")
+            signal_groups.add("Seniority")
+
+        elif tag_text in uae_keywords + mena_keywords:
+            boost = GEO_GROUP_BONUS * HASHTAG_MULTIPLIER
+            score += boost
+            hashtag_hits.append(f"#{tag} → geography (+{round(boost,1)})")
+            signal_groups.add("Geography")
+
+    if hashtag_hits:
+        breakdown.append("Hashtag signals: " + " | ".join(hashtag_hits))
 
     location_match = re.search(r"location:\s*([^\n|·]+)", text, re.IGNORECASE)
     if location_match:
@@ -136,7 +162,7 @@ def score_text(text, query, url=""):
         
         if "dubai" in text or "abu dhabi" in text:
             geo_boost += 0.3
-            breakdown.append("Explicit UAE city mentioned")
+            breakdown.append("Explicit UAE city mentioned (+0.3)")
         
         breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
         score += geo_boost
@@ -145,8 +171,8 @@ def score_text(text, query, url=""):
         score += GEO_GROUP_BONUS
         breakdown.append("UAE LinkedIn domain")
     elif score >= 5.0 and "Geography" not in signal_groups:
-        score -= 0.5
-        breakdown.append("High score without geography confirmation")
+        score -= 1.0
+        breakdown.append("High score without geography confirmation (-0.5)")
    
     score = max(0.0, min(score, 10.0))
 
