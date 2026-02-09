@@ -240,6 +240,9 @@ def score_text(text, query, url=""):
         comp_clean = comp.strip(" .,-·")
         comp_lower = comp_clean.lower()
 
+        if re.search(r"\b(january|february|march|april|may|june|july|august|september|october|november|december)\b", comp_lower):
+            continue
+
         # HARD BLOCK: temporal phrases
         if re.search(r"\b(19|20)\d{2}\b", comp_lower):
             continue
