@@ -157,110 +157,70 @@ def score_text(text, query, url=""):
         signal_groups.add("Seniority")
 
     # -------------------------
-    # Company enrichment (robust)
+    # Company enrichment
     # -------------------------
-
     company_candidates = []
+    text_for_extraction = text_original  # Use case-preserved text
 
-    sentences = re.split(r"[.\n]", text_original)
-    for sentence in sentences:
-        s = sentence.strip()
-        if not s:
-            continue
-
-        # HARD BLOCK: multi-company or list-like sentences
-        if re.search(r"\band\b", s.lower()):
-            continue
-
-        # Possessive senior role → company (TMT Law's Chief Operating Officer)
-        company_candidates.extend(re.findall(
-            r"\b([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
-            r"(?:Chief|Senior|Managing|Executive|Head|Vice President|VP)\s+"
-            r"(?:Operating\s+)?"
-            r"(?:Officer|Director|Partner)",
-            s
-        ))
-
-        # Role @ Company (LinkedIn-style, case-insensitive company)
-        company_candidates.extend(re.findall(
-            r"\b(?:head|lead|director|manager|vp|chief)\b[^@]{0,40}"
-            r"(?:@| at | for )\s*"
-            r"([A-Za-z][A-Za-z0-9 &.\-]{2,50})",
-            s,
-            re.IGNORECASE
-        ))
-
-    # STRONG global founder / C-level patterns (allowed globally)
+    # Pattern 1: | Role, Company | (pipe-delimited)
     company_candidates.extend(re.findall(
-        r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner)\b'
-        r'(?:\s*&\s*\w+)?'
-        r'\s+(?:at|@|of)\s+'
-        r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
-        text_original,
-        re.IGNORECASE
+        r'\|\s*(?:CEO|CFO|COO|CTO|Founder|Co-Founder|Managing Director|Founder & CEO|Co-Founder & CEO)'
+        r',\s+([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_for_extraction
     ))
 
-    # Angel / investor phrasing (explicit)
+    # Pattern 2: Possessive (TMT Law's Chief Operating Officer)
+    company_candidates.extend(re.findall(
+        r"\b([A-Z][A-Za-z0-9 &.\-]{2,50})['']s\s+"
+        r"(?:Chief|Senior|Managing|Executive|Head|Vice President|VP|Board)\s+"
+        r"(?:Operating\s+|Executive\s+|Financial\s+|Technology\s+|Investment\s+)?"
+        r"(?:Officer|Director|Partner|Member)",
+        text_for_extraction
+    ))
+
+    # Pattern 3: CEO, Company (comma separator, NOT in pipes)
+    company_candidates.extend(re.findall(
+        r'(?<!\|)\s*(?:CEO|CFO|COO|CTO|Founder|Co-Founder|Managing Director),\s+([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_for_extraction
+    ))
+
+    # Pattern 4: Role at/of Company
+    company_candidates.extend(re.findall(
+        r'\b(?:CEO|CFO|COO|CTO|Founder|Co-Founder|Director|Partner|Head|VP)\s+'
+        r'(?:&\s+\w+\s+)?'  # Allows "Founder & CEO"
+        r'(?:at|@|of)\s+'
+        r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_for_extraction
+    ))
+
+    # Pattern 5: Angel Investor at Company
     company_candidates.extend(re.findall(
         r"\bAngel Investor\s+(?:at|@)\s+([A-Z][A-Za-z0-9 &.\-]{2,50})",
-        text_original,
-        re.IGNORECASE
-    ))
-
-
-    # Venture-style phrasing
-    company_candidates.extend(re.findall(
-        r'\b(?:started|founded)\s+(?:the\s+)?(?:own\s+)?'
-        r'(?:venture|company|startup)?\s*(?:of|called)?\s*[‘"\']?'
-        r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
-        text_original,
-        re.IGNORECASE
+        text_for_extraction
     ))
 
     # -------------------------
-    # Cleaning & validation
+    # Cleaning
     # -------------------------
-
-    stop_phrases = [
-        "years of", "experience", "worked with", "experience in",
-        "services", "solutions", "expansion", "linkedin"
-    ]
+    stop_phrases = ["years of", "experience in", "worked with", "background in"]
+    stop_words = {"linkedin", "experience", "global", "business", "expert"}
 
     cleaned_companies = []
     for comp in company_candidates:
-        comp_clean = comp.strip(" .,-·")
+        comp_clean = comp.strip(" .,-·|")
         comp_lower = comp_clean.lower()
-
-        # HARD BLOCK: temporal phrases
-        if re.search(r"\b(19|20)\d{2}\b", comp_lower):
+        
+        if len(comp_clean) < 3 or re.search(r"\b(19|20)\d{2}\b", comp_clean):
             continue
-
-        # HARD BLOCK: sentence fragments masquerading as companies
-        if comp_lower.startswith(("a ", "the ")):
-            continue
-
-        if len(comp_clean) < 3:
+        if comp_lower.startswith(("a ", "the ")) or comp_lower in stop_words:
             continue
         if any(bad in comp_lower for bad in stop_phrases):
             continue
-        if re.fullmatch(r"\d+", comp_clean):
-            continue
-
-        descriptor_blocks = {
-            "career", "experience", "background", "journey", "early",
-            "age", "years", "industry", "field", "space",
-            "company", "companies", "organization", "organizations",
-            "venture", "ventures", "startup", "startups",
-            "business", "businesses", "firm", "firms"
-        }
-
-        first_words = comp_lower.split()[:3]
-        if any(w in descriptor_blocks for w in first_words):
-            continue
-
+        if " and " in comp_lower and len(comp_lower.split()) > 4:
+            continue  # Multi-company list
+        
         cleaned_companies.append(comp_clean)
 
-    # Deduplicate while preserving order
     cleaned_companies = list(dict.fromkeys(cleaned_companies))
 
     enriched_company = ""
@@ -269,32 +229,31 @@ def score_text(text, query, url=""):
         score += 0.3
         breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
 
+        geo_boost = 0
+        if any(k in text for k in uae_keywords + mena_keywords):
+            signal_groups.add("Geography")
+            geo_boost += GEO_GROUP_BONUS
+            
+            if "dubai" in text or "abu dhabi" in text:
+                geo_boost += 0.3
+                breakdown.append("Explicit UAE city mentioned (+0.3)")
+            
+            breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
+            score += geo_boost
 
-    geo_boost = 0
-    if any(k in text for k in uae_keywords + mena_keywords):
-        signal_groups.add("Geography")
-        geo_boost += GEO_GROUP_BONUS
-        
-        if "dubai" in text or "abu dhabi" in text:
-            geo_boost += 0.3
-            breakdown.append("Explicit UAE city mentioned (+0.3)")
-        
-        breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
-        score += geo_boost
+        if "ae.linkedin.com/in" in url:
+            score += GEO_GROUP_BONUS
+            breakdown.append("UAE LinkedIn domain")
+        elif score >= 5.0 and "Geography" not in signal_groups:
+            score -= 1.0
+            breakdown.append("High score without geography confirmation (-0.5)")
+    
+        score = max(0.0, min(score, 10.0))
 
-    if "ae.linkedin.com/in" in url:
-        score += GEO_GROUP_BONUS
-        breakdown.append("UAE LinkedIn domain")
-    elif score >= 5.0 and "Geography" not in signal_groups:
-        score -= 1.0
-        breakdown.append("High score without geography confirmation (-0.5)")
-   
-    score = max(0.0, min(score, 10.0))
+        confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
+        breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
 
-    confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
-    breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
-
-    return score, confidence, breakdown, enriched_company
+        return score, confidence, breakdown, enriched_company
 
 def is_valid_person_name(name):
     if not name:
