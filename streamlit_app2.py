@@ -229,31 +229,31 @@ def score_text(text, query, url=""):
         score += 0.3
         breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
 
-        geo_boost = 0
-        if any(k in text for k in uae_keywords + mena_keywords):
-            signal_groups.add("Geography")
-            geo_boost += GEO_GROUP_BONUS
-            
-            if "dubai" in text or "abu dhabi" in text:
-                geo_boost += 0.3
-                breakdown.append("Explicit UAE city mentioned (+0.3)")
-            
-            breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
-            score += geo_boost
+    geo_boost = 0
+    if any(k in text for k in uae_keywords + mena_keywords):
+        signal_groups.add("Geography")
+        geo_boost += GEO_GROUP_BONUS
+        
+        if "dubai" in text or "abu dhabi" in text:
+            geo_boost += 0.3
+            breakdown.append("Explicit UAE city mentioned (+0.3)")
+        
+        breakdown.append(f"Geography signals (+{round(geo_boost, 1)})")
+        score += geo_boost
 
-        if "ae.linkedin.com/in" in url:
-            score += GEO_GROUP_BONUS
-            breakdown.append("UAE LinkedIn domain")
-        elif score >= 5.0 and "Geography" not in signal_groups:
-            score -= 1.0
-            breakdown.append("High score without geography confirmation (-0.5)")
-    
-        score = max(0.0, min(score, 10.0))
+    if "ae.linkedin.com/in" in url:
+        score += GEO_GROUP_BONUS
+        breakdown.append("UAE LinkedIn domain")
+    elif score >= 5.0 and "Geography" not in signal_groups:
+        score -= 1.0
+        breakdown.append("High score without geography confirmation (-0.5)")
+   
+    score = max(0.0, min(score, 10.0))
 
-        confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
-        breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
+    confidence = "High" if len(signal_groups) >= 3 else "Medium" if len(signal_groups) == 2 else "Low"
+    breakdown.insert(0, f"Signal groups fired: {len(signal_groups)}")
 
-        return score, confidence, breakdown, enriched_company
+    return score, confidence, breakdown, enriched_company
 
 def is_valid_person_name(name):
     if not name:
