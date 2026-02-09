@@ -11,7 +11,7 @@ from first_pass import (
 # Domains that are pure noise and should result in a 0 score
 NOISE_DOMAINS = [
     "wikipedia.org", "saatchiart.com", "researchgate.net", 
-    "academia.edu", "sciprofiles.com"
+    "academia.edu", "sciprofiles.com", "datapile.co"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
@@ -100,10 +100,9 @@ def score_second_pass(text, url, state):
     if "linkedin.com/pub/dir" in url:
         return 0, ["LinkedIn directory page ignored"], False
 
-    if "/in/" in url:
-        if state["linkedin_seen"]:
-            return 0, ["Extra LinkedIn profile ignored"], False
-        state["linkedin_seen"] = True
+    if "linkedin.com/in" in url:
+        return 0, ["LinkedIn profile ignored in second pass"], False
+
 
     # --- SCORING LOGIC ---
 
