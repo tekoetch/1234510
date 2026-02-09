@@ -172,29 +172,20 @@ def score_text(text, query, url=""):
         if re.search(r"\band\b", s.lower()):
             continue
 
-        # Possessive role → company (e.g. TMT Law's COO)
+        # Possessive senior role → company (TMT Law's Chief Operating Officer)
         company_candidates.extend(re.findall(
-            r"([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
-            r"(?:chief|head|director|officer|partner|manager|lead)"
+            r"\b([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
+            r"(?:Chief|Senior|Managing|Executive|Head|Vice President|VP)\s+"
+            r"(?:Operating\s+)?"
             r"(?:Officer|Director|Partner)",
-            s,
-            re.IGNORECASE
+            s
         ))
 
-        # Role-verb → company (e.g. leads finance at Company)
+        # Role @ Company (LinkedIn-style, case-insensitive company)
         company_candidates.extend(re.findall(
-            r"(?:as|serves as|acting as|leads|leading|oversees|heads)\s+"
-            r"(?:the\s+)?[^,]{0,40}\s+"
-            r"(?:at|for)\s+"
-            r"([A-Z][A-Za-z0-9 &.\-]{2,50})",
-            s,
-            re.IGNORECASE
-        ))
-
-        # Role @ Company (e.g. Head of Marketing @ Qashio)
-        company_candidates.extend(re.findall(
-            r'(?:head|lead|director|manager|vp|chief)\s+of\s+[^@]{1,40}\s*[@|at|for]\s*'
-            r'([A-Z][A-Za-z0-9 &.\-]{2,50})',
+            r"\b(?:head|lead|director|manager|vp|chief)\b[^@]{0,40}"
+            r"(?:@| at | for )\s*"
+            r"([A-Za-z][A-Za-z0-9 &.\-]{2,50})",
             s,
             re.IGNORECASE
         ))
@@ -242,6 +233,10 @@ def score_text(text, query, url=""):
 
         # HARD BLOCK: temporal phrases
         if re.search(r"\b(19|20)\d{2}\b", comp_lower):
+            continue
+
+        # HARD BLOCK: sentence fragments masquerading as companies
+        if comp_lower.startswith(("a ", "the ")):
             continue
 
         if len(comp_clean) < 3:
