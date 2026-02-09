@@ -116,7 +116,7 @@ def score_text(text, query, url=""):
 
     if hashtag_hits:
         breakdown.append("Hashtag signals: " + " | ".join(hashtag_hits))
-
+        
     location_match = re.search(r"location:\s*([^\n|·]+)", text, re.IGNORECASE)
     if location_match:
         loc = location_match.group(1)
@@ -179,7 +179,7 @@ def score_text(text, query, url=""):
             r"(?:Operating\s+)?"
             r"(?:Officer|Director|Partner)\b",
             s,
-            re.IGNORECASE  # optional, but helps
+            re.IGNORECASE
         ))
 
         # Role @ Company (LinkedIn-style, case-insensitive company)
@@ -216,7 +216,6 @@ def score_text(text, query, url=""):
         text_original,
         re.IGNORECASE
     ))
-
 
     # Venture-style phrasing
     company_candidates.extend(re.findall(
@@ -279,7 +278,6 @@ def score_text(text, query, url=""):
         score += 0.3
         breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
 
-
     geo_boost = 0
     if any(k in text for k in uae_keywords + mena_keywords):
         signal_groups.add("Geography")
@@ -298,6 +296,11 @@ def score_text(text, query, url=""):
     elif score >= 5.0 and "Geography" not in signal_groups:
         score -= 1.0
         breakdown.append("High score without geography confirmation (-0.5)")
+
+    if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in"]):
+        score -= 0.3
+        breakdown.append("Outside Region LinkedIn country domain (-0.3)")
+    
    
     score = max(0.0, min(score, 10.0))
 
@@ -310,7 +313,9 @@ def is_valid_person_name(name):
     if not name:
         return False
     if len(name.split()) < 2:
-        return True
+        return False
+    if re.fullmatch(r"[A-Z][a-z]+\s*\.", name):
+        return False
     if name.lower() in {"angel investor", "venture capital"}:
         return False
     return True
