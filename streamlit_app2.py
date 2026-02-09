@@ -81,12 +81,6 @@ def score_text(text, query, url=""):
     text_original = text
     text = text.lower()
     score = BASE_SCORE
-
-    location_match = re.search(r"location:\s*([^\n|·]+)", text)
-    if location_match:
-        loc = location_match.group(1)
-        if not any(k in loc for k in uae_keywords + mena_keywords):
-            return 0.0, "Low", ["Hard reject: explicit non-UAE/MENA location"]
         
     hashtags = re.findall(r'#(\w+)', text.lower())
     hashtag_hits = []
@@ -125,11 +119,11 @@ def score_text(text, query, url=""):
 
     location_match = re.search(r"location:\s*([^\n|·]+)", text, re.IGNORECASE)
     if location_match:
-        loc = location_match.group(1).lower()
+        loc = location_match.group(1)
         if any(k in loc for k in uae_keywords + mena_keywords):
             score += 0.5
             breakdown.append("Explicit UAE location (+0.5)")
-        elif any(bad in loc for bad in ["london", "singapore", "new york", "usa", "uk", "india"]):
+        elif any(bad in loc for bad in ["Singapore", "New York", "United States", "UK", "London" "India"]):
             score -= 1.5 
             breakdown.append("Non-MENA location detected (-1.5)")
 
