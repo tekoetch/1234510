@@ -162,14 +162,14 @@ def score_text(text, query, url=""):
 
     company_candidates = []
 
-    sentences = re.split(r"[.\n•]", text_original)
+    sentences = re.split(r"[.\n]", text_original)
     for sentence in sentences:
         s = sentence.strip()
         if not s:
             continue
 
         # HARD BLOCK: multi-company or list-like sentences
-        if re.search(r"\band\b|,", s.lower()):
+        if re.search(r"\band\b", s.lower()):
             continue
 
         # Possessive role → company (e.g. TMT Law's COO)
@@ -186,6 +186,14 @@ def score_text(text, query, url=""):
             r"(?:the\s+)?[^,]{0,40}\s+"
             r"(?:at|for)\s+"
             r"([A-Z][A-Za-z0-9 &.\-]{2,50})",
+            s,
+            re.IGNORECASE
+        ))
+
+        # Role @ Company (e.g. Head of Marketing @ Qashio)
+        company_candidates.extend(re.findall(
+            r'(?:head|lead|director|manager|vp|chief)\s+of\s+[^@]{1,40}\s*[@|at|for]\s*'
+            r'([A-Z][A-Za-z0-9 &.\-]{2,50})',
             s,
             re.IGNORECASE
         ))
@@ -223,6 +231,10 @@ def score_text(text, query, url=""):
         comp_clean = comp.strip(" .,-·")
         comp_lower = comp_clean.lower()
 
+        # HARD BLOCK: temporal phrases
+        if re.search(r"\b(19|20)\d{2}\b", comp_lower):
+            continue
+
         if len(comp_clean) < 3:
             continue
         if any(bad in comp_lower for bad in stop_phrases):
@@ -241,7 +253,7 @@ def score_text(text, query, url=""):
         first_words = comp_lower.split()[:3]
         if any(w in descriptor_blocks for w in first_words):
             continue
-        
+
         cleaned_companies.append(comp_clean)
 
     # Deduplicate while preserving order
