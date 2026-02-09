@@ -209,7 +209,7 @@ if st.button("Run Second Pass Verification"):
                     status_text.write(f"Querying: {q}")
 
                     try:
-                        results = list(ddgs.text(q, max_results=5, backend="html"))
+                        results = list(ddgs.text(q, max_results=12, backend="html"))
                     except Exception: 
                         continue
                         
