@@ -1,5 +1,35 @@
 import re
 
+BASE_SCORE = 2.0
+IDENTITY_WEIGHT = 2.5
+IDENTITY_DIMINISHING_WEIGHT = 0.8
+BEHAVIOR_WEIGHT = 0.4
+BEHAVIOR_GROUP_BONUS = 0.5
+SENIORITY_WEIGHT = 1.0
+SENIORITY_GROUP_BONUS = 0.5
+GEO_GROUP_BONUS = 0.6
+
+identity_keywords = [
+    "angel investor", "angel investing", "family office",
+    "venture partner", "chief investment officer", "cio",
+    "founder", "co-founder", "ceo", "incubator"
+]
+
+behavior_keywords = [
+    "invested in", "investing in", "portfolio",
+    "seed", "pre-seed", "early-stage", "funding",
+    "venture capital", "private equity", "real estate",
+    "fundraising", "investment portfolio", "wealth funds"
+]
+
+seniority_keywords = [
+    "partner", "managing director", "chairman",
+    "board member", "advisor", "advisory"
+]
+
+uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
+mena_keywords = ["mena", "middle east", "gulf"]
+
 def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
