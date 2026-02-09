@@ -173,6 +173,19 @@ def score_text(text, query, url=""):
         re.IGNORECASE
     ))
 
+    # For cases like 'As Company Names Chief Operating Officer'
+    company_candidates.extend(re.findall(
+        r"\b([A-Z][A-Za-z0-9 &\.\-]{2,50})'s\s+(?:Chief|Senior|Managing|Executive)\s+(?:Officer|Partner|Director)",
+        text_original
+    ))
+
+    # For cases like 'at two companies: company name'
+    company_candidates.extend(re.findall(
+        r'\b(?:at|companies:)\s+([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_original,
+        re.IGNORECASE
+    ))
+
     # Venture-style phrasing
     company_candidates.extend(re.findall(
         r'\b(?:started|founded)\s+(?:the\s+)?(?:own\s+)?(?:venture|company|startup)?\s*(?:of|called)?\s*[‘"\']?'
@@ -198,7 +211,7 @@ def score_text(text, query, url=""):
             continue
         if any(bad in comp_lower for bad in stop_phrases):
             continue
-        if re.search(r"\d+", comp_clean):
+        if re.fullmatch(r"\d+", comp_clean):
             continue
 
         cleaned_companies.append(comp_clean)
