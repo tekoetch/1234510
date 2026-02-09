@@ -268,6 +268,7 @@ if not df_first.empty:
             investor = "Yes" if any("Confirmed investor identity" in x for x in all_breakdowns) else "No"
             uae = "Yes" if any("geography" in x.lower() for x in all_breakdowns) else "No"
             
+            snippets = g["Snippet"].tolist()
             companies = set()
             for s in snippets:
                 matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
