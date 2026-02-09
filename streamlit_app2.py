@@ -127,7 +127,7 @@ if st.button("Run Discovery"):
                         existing["Confidence"] = "Medium"
 
                 else:
-                    st.session_state.first_pass_results({
+                    st.session_state.first_pass_results.append({
                         "Reviewed": False,
                         "Name": name,
                         "Title": title,
