@@ -82,6 +82,12 @@ def score_text(text, query, url=""):
     text = text.lower()
     score = BASE_SCORE
 
+    location_match = re.search(r"location:\s*([^\n|·]+)", text)
+    if location_match:
+        loc = location_match.group(1)
+        if not any(k in loc for k in uae_keywords + mena_keywords):
+            return 0.0, "Low", ["Hard reject: explicit non-UAE/MENA location"]
+        
     hashtags = re.findall(r'#(\w+)', text.lower())
     hashtag_hits = []
 
@@ -294,7 +300,7 @@ def score_text(text, query, url=""):
 
     if "ae.linkedin.com/in" in url:
         score += GEO_GROUP_BONUS
-        breakdown.append("UAE LinkedIn domain")
+        breakdown.append("UAE LinkedIn domain (+0.6)")
     elif score >= 5.0 and "Geography" not in signal_groups:
         score -= 1.0
         breakdown.append("High score without geography confirmation (-0.5)")
