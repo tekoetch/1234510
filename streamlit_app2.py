@@ -204,26 +204,33 @@ if st.button("Run Second Pass Verification"):
                         break
                         
                     time.sleep(1.0) # Polite delay
+                    status_text.write(f"Querying: {q}")
+
                     try:
                         results = list(ddgs.text(q, max_results=5, backend="html"))
-                    except: 
+                    except Exception: 
                         continue
                         
                     for r in results:
                         url = r.get("href", "")
                         if not url: continue
+
+                        norm_url = normalize_url(url)
+                        if any(bad in norm_url for bad in blocked_urls):
+                            continue
                         
                         text = f"{r.get('title','')} {r.get('body','')}"
                         score2, breakdown2, id_conf = second_pass.score_second_pass(text, url, state)
                         
                         if score2 > 0:
                             candidate_verified_data.append({
-                                "Name": name,
-                                "Second Pass Score": score2,
-                                "Score Breakdown": breakdown2,
-                                "Snippet": text,
-                                "Source URL": url
-                            })
+                            "Name": name,
+                            "Query Used": q,
+                            "Snippet": text,
+                            "Second Pass Score": score2,
+                            "Score Breakdown": " | ".join(breakdown2),
+                            "Source URL": url
+                        })
                             
                 # Add best results to session state
                 if candidate_verified_data:
@@ -261,9 +268,22 @@ if not df_first.empty:
             investor = "Yes" if any("Confirmed investor identity" in x for x in all_breakdowns) else "No"
             uae = "Yes" if any("geography" in x.lower() for x in all_breakdowns) else "No"
             
+            companies = set()
+            for s in snippets:
+                matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
+                for _, company in matches:
+                    companies.add(company.strip())
+
             # Rocketreach check
             has_rocketreach = any("rocketreach.co" in u for u in g["Source URL"])
             
+            if total >= 4.5:
+                evidence_strength = "Strong"
+            elif total >= 2.5:
+                evidence_strength = "Moderate"
+            else:
+                evidence_strength = "Weak"
+
             # Verdict Logic
             if investor == "Yes" and uae == "Yes" and total >= 4.5:
                 verdict = "ACCEPT"
@@ -276,9 +296,12 @@ if not df_first.empty:
                 "Name": name,
                 "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
                 "Second Pass Total": round(total, 1),
+                "Evidence Rows": len(g),
                 "Investor Confirmed": investor,
                 "UAE Confirmed": uae,
-                "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "No",
+                "Enriched Company": ", ".join(sorted(companies)),
+                "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
+                "Evidence Strength": evidence_strength,
                 "Final Verdict": verdict
             })
 
@@ -291,9 +314,11 @@ if not df_first.empty:
                 "Name": name,
                 "First Pass Score": row["Score"],
                 "Second Pass Total": 0.0,
+                "Evidence Rows": 0,
                 "Investor Confirmed": "Pending",
                 "UAE Confirmed": "Pending",
-                "Enriched Social": "No",
+                "Enriched Company": "",
+                "Enriched Social": "",
                 "Final Verdict": "PENDING"
             })
 
