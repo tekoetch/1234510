@@ -175,7 +175,8 @@ def score_text(text, query, url=""):
         # Possessive role → company (e.g. TMT Law's COO)
         company_candidates.extend(re.findall(
             r"([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
-            r"(?:chief|head|director|officer|partner|manager|lead)",
+            r"(?:chief|head|director|officer|partner|manager|lead)"
+            r"(?:Officer|Director|Partner)",
             s,
             re.IGNORECASE
         ))
@@ -207,6 +208,14 @@ def score_text(text, query, url=""):
         text_original,
         re.IGNORECASE
     ))
+
+    # Angel / investor phrasing (explicit)
+    company_candidates.extend(re.findall(
+        r"\bAngel Investor\s+(?:at|@)\s+([A-Z][A-Za-z0-9 &.\-]{2,50})",
+        text_original,
+        re.IGNORECASE
+    ))
+
 
     # Venture-style phrasing
     company_candidates.extend(re.findall(
