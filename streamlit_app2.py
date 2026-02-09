@@ -176,7 +176,8 @@ def score_text(text, query, url=""):
         company_candidates.extend(re.findall(
             r"([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
             r"(?:chief|head|director|officer|partner|manager|lead)",
-            s
+            s,
+            re.IGNORECASE
         ))
 
         # Role-verb → company (e.g. leads finance at Company)
@@ -229,6 +230,18 @@ def score_text(text, query, url=""):
         if re.fullmatch(r"\d+", comp_clean):
             continue
 
+        descriptor_blocks = {
+            "career", "experience", "background", "journey", "early",
+            "age", "years", "industry", "field", "space",
+            "company", "companies", "organization", "organizations",
+            "venture", "ventures", "startup", "startups",
+            "business", "businesses", "firm", "firms"
+        }
+
+        first_words = comp_lower.split()[:3]
+        if any(w in descriptor_blocks for w in first_words):
+            continue
+        
         cleaned_companies.append(comp_clean)
 
     # Deduplicate while preserving order
@@ -295,7 +308,7 @@ max_results_per_query = st.number_input(
     "Results per query",
     min_value=1,
     max_value=50,
-    value=10,
+    value=20,
     step=1
 )
 
