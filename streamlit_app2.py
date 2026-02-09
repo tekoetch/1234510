@@ -167,7 +167,9 @@ if st.button("Run Second Pass Verification"):
         st.error("No leads to verify.")
     else:
         # Filter for candidates
-        candidates = df_first[df_first["Score"] >= 3.8] # Threshold
+        SECOND_PASS_THRESHOLD = 5.0
+        candidates = df_first[df_first["Score"] >= SECOND_PASS_THRESHOLD]
+
         total = len(candidates)
         
         verify_progress = st.progress(0)
@@ -242,7 +244,7 @@ if st.button("Run Second Pass Verification"):
 df_second = pd.DataFrame(st.session_state.second_pass_results)
 
 if not df_second.empty:
-    st.dataframe(df_second[["Name", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
+    st.dataframe(df_second[["Name", "Query Used", "Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
 
 # --- SECTION 3: CONSOLIDATION (Your Logic) ---
 
