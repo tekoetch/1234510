@@ -109,9 +109,9 @@ if st.button("Run Discovery"):
                     continue
 
                 # Upsert Logic
-                existing_idx = find_existing_person(url, st.session_state.results)
+                existing_idx = find_existing_person(url, st.session_state.first_pass_results)
                 if existing_idx is not None:
-                    existing = st.session_state.results[existing_idx]
+                    existing = st.session_state.first_pass_results[existing_idx]
 
                     existing["Snippet"] += "\n---\n" + snippet
                     existing["Title"] = existing["Title"]
@@ -127,7 +127,7 @@ if st.button("Run Discovery"):
                         existing["Confidence"] = "Medium"
 
                 else:
-                    st.session_state.results.append({
+                    st.session_state.first_pass_results({
                         "Reviewed": False,
                         "Name": name,
                         "Title": title,
