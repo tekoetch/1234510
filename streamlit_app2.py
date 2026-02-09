@@ -21,7 +21,7 @@ GEO_GROUP_BONUS = 0.6
 identity_keywords = [
     "angel investor", "angel investing", "family office",
     "venture partner", "chief investment officer", "cio",
-    "founder", "co-founder", "ceo"
+    "founder", "co-founder", "ceo", "incubator"
 ]
 
 behavior_keywords = [
@@ -169,8 +169,8 @@ def score_text(text, query, url=""):
             continue
 
         # HARD BLOCK: multi-company or list-like sentences
-        if re.search(r"\band\b", s.lower()):
-            continue
+        #if re.search(r"\band\b", s.lower()):
+        #    continue
 
         # Possessive senior role → company (TMT Law's Chief Operating Officer)
         company_candidates.extend(re.findall(
@@ -193,10 +193,19 @@ def score_text(text, query, url=""):
 
     # STRONG global founder / C-level patterns (allowed globally)
     company_candidates.extend(re.findall(
-        r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner)\b'
+        r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner|President|Chairman|Director|Member)\b'
         r'(?:\s*&\s*\w+)?'
         r'\s+(?:at|@|of)\s+'
         r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
+        text_original,
+        re.IGNORECASE
+    ))
+
+    # Pattern: | Role, Company | or | Role, Company
+    company_candidates.extend(re.findall(
+        r'\|\s*(?:CEO|CFO|COO|CTO|Founder|Co-Founder|Managing Director|Founder & CEO)'
+        r'(?:\s*[&,]\s*\w+)?'  # Handles "Founder & CEO"
+        r',\s+([A-Z][A-Za-z0-9 &\.\-]{2,50})',
         text_original,
         re.IGNORECASE
     ))
