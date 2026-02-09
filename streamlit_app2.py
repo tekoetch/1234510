@@ -160,10 +160,36 @@ def score_text(text, query, url=""):
     # Company enrichment (robust)
     # -------------------------
 
-    # Reconstruct a capitalized source (DO NOT use lowercased text)
-    capital_text = text_original
     company_candidates = []
 
+    sentences = re.split(r"[.\n•]", text_original)
+    for sentence in sentences:
+        s = sentence.strip()
+        if not s:
+            continue
+
+        # HARD BLOCK: multi-company or list-like sentences
+        if re.search(r"\band\b|,", s.lower()):
+            continue
+
+        # Possessive role → company (e.g. TMT Law's COO)
+        company_candidates.extend(re.findall(
+            r"([A-Z][A-Za-z0-9 &.\-]{2,50})['’]s\s+"
+            r"(?:chief|head|director|officer|partner|manager|lead)",
+            s
+        ))
+
+        # Role-verb → company (e.g. leads finance at Company)
+        company_candidates.extend(re.findall(
+            r"(?:as|serves as|acting as|leads|leading|oversees|heads)\s+"
+            r"(?:the\s+)?[^,]{0,40}\s+"
+            r"(?:at|for)\s+"
+            r"([A-Z][A-Za-z0-9 &.\-]{2,50})",
+            s,
+            re.IGNORECASE
+        ))
+
+    # STRONG global founder / C-level patterns (allowed globally)
     company_candidates.extend(re.findall(
         r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner)\b'
         r'(?:\s*&\s*\w+)?'
@@ -173,22 +199,10 @@ def score_text(text, query, url=""):
         re.IGNORECASE
     ))
 
-    # For cases like 'As Company Names Chief Operating Officer'
-    company_candidates.extend(re.findall(
-        r"\b([A-Z][A-Za-z0-9 &\.\-]{2,50})'s\s+(?:Chief|Senior|Managing|Executive)\s+(?:Officer|Partner|Director)",
-        text_original
-    ))
-
-    # For cases like 'at two companies: company name'
-    company_candidates.extend(re.findall(
-        r'\b(?:at|companies:)\s+([A-Z][A-Za-z0-9 &\.\-]{2,50})',
-        text_original,
-        re.IGNORECASE
-    ))
-
     # Venture-style phrasing
     company_candidates.extend(re.findall(
-        r'\b(?:started|founded)\s+(?:the\s+)?(?:own\s+)?(?:venture|company|startup)?\s*(?:of|called)?\s*[‘"\']?'
+        r'\b(?:started|founded)\s+(?:the\s+)?(?:own\s+)?'
+        r'(?:venture|company|startup)?\s*(?:of|called)?\s*[‘"\']?'
         r'([A-Z][A-Za-z0-9 &\.\-]{2,50})',
         text_original,
         re.IGNORECASE
@@ -197,6 +211,7 @@ def score_text(text, query, url=""):
     # -------------------------
     # Cleaning & validation
     # -------------------------
+
     stop_phrases = [
         "years of", "experience", "worked with", "experience in",
         "services", "solutions", "expansion", "linkedin"
@@ -224,6 +239,7 @@ def score_text(text, query, url=""):
         enriched_company = cleaned_companies[0]
         score += 0.3
         breakdown.append(f"Company affiliation: {enriched_company} (+0.3)")
+
 
     geo_boost = 0
     if any(k in text for k in uae_keywords + mena_keywords):
