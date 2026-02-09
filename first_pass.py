@@ -1,3 +1,5 @@
+import re
+
 def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
