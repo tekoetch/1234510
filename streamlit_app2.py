@@ -74,7 +74,7 @@ query_input = st.text_area(
     placeholder='"angel investor" UAE site:linkedin.com/in'
 )
 
-max_results_per_query = st.number_input("Results per query", 1, 50, 15)
+max_results_per_query = st.number_input("Results per query", 1, 50, 10)
 
 if st.button("Run Discovery"):
     queries = [q.strip() for q in query_input.split("\n") if q.strip()]
@@ -95,6 +95,18 @@ if st.button("Run Discovery"):
 
                 title = soft_truncate_ellipsis(r.get("title", ""))
                 snippet = soft_truncate_ellipsis(r.get("body", ""))
+
+                # Robust clean: Handle multi-person LinkedIn titles (only affect title, not snippet)
+                if " | LinkedIn" in title:
+                    # Use regex to find the first " | LinkedIn" (handling spaces/dashes)
+                    match = re.search(r'(\s*[-–—]?\s*\|\s*LinkedIn)', title)
+                    if match:
+                        cut_idx = match.start()
+                        title = title[:cut_idx + len(match.group(0))].strip()
+                    else:
+                        # Fallback: Simple split if regex misses (rare)
+                        parts = title.split(" | LinkedIn")
+                        title = parts[0].strip() + " | LinkedIn"
                 
                 # Check Duplicates
                 if is_duplicate_url(url, st.session_state.first_pass_results, title, snippet):
