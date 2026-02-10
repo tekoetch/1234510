@@ -269,7 +269,7 @@ if "Title" not in df_second.columns:
     df_second["Title"] = ""
 
 if not df_second.empty:
-    st.dataframe(df_second[["Name", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
+    st.dataframe(df_second[["Name", "Query Used", "Title","Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
 
 # --- SECTION 3: CONSOLIDATION (Fixed Logic) ---
 
