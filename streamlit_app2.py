@@ -251,7 +251,7 @@ if st.button("Run Second Pass Verification"):
                     status_text.write(f"Querying: {q}")
 
                     try:
-                        results = list(ddgs.text(q, max_results=12, backend="html"))
+                        results = list(ddgs.text(q, max_results=20, backend="html"))
                     except Exception: 
                         continue
                         
@@ -340,8 +340,16 @@ if not df_first.empty:
                 for _, company in matches:
                     companies.add(company.strip())
 
-            # Rocketreach check
-            has_rocketreach = any("rocketreach.co" in u for u in g["Source URL"])
+            # Enrichment sources check
+            sources = []
+            if any("rocketreach.co" in url.lower() for url in g["Source URL"]):
+                sources.append("RocketReach")
+            if any("zoominfo.com" in url.lower() for url in g["Source URL"]):
+                sources.append("ZoomInfo")
+
+            enriched_social = ""
+            if sources:
+                enriched_social = f"Yes ({', '.join(sources)})"
             
             if total >= 4.5:
                 evidence_strength = "Strong"
@@ -395,7 +403,7 @@ if not df_first.empty:
                 "Investor Confirmed": investor,
                 "UAE Confirmed": uae,
                 "Enriched Company": final_company,
-                "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
+                "Enriched Social": enriched_social,
                 "Evidence Strength": evidence_strength,
                 "Final Verdict": verdict
             })
@@ -404,7 +412,7 @@ if not df_first.empty:
     pending_names = all_first_pass_names - verified_names
     for name in pending_names:
         row = df_first[df_first["Name"] == name].iloc[0]
-        if row["Score"] >= 3.8:
+        if row["Score"] >= 5:
             consolidated.append({
                 "Name": name,
                 "First Pass Score": row["Score"],
