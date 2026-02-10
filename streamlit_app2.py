@@ -153,7 +153,7 @@ df_first = pd.DataFrame(st.session_state.first_pass_results)
 
 if not df_first.empty:
     st.dataframe(
-        df_first[["Name", "Score", "Enriched Company", "Confidence", "Signals"]].sort_values("Score", ascending=False),
+        df_first[["Name", "Title", "Snippet", "Enriched Company", "Score", "Confidence", "Signals", "URL"]],
         use_container_width=True
     )
 
