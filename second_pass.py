@@ -17,12 +17,16 @@ NOISE_DOMAINS = [
     "new-delhi.startups-list.com", "appriffy.com",
     "ycombinator.com", "kr-asia.com", "www.goswirl.ai",
     "www.science.gov", "cryptonews.com", "blog.founderfirst.org",
-    "abcnews.go.com", "www.wamda.com", "www.startupresearcher.com"
+    "abcnews.go.com", "www.wamda.com", "www.startupresearcher.com",
+    "www.cbnme.com", "www.standard.co.uk", "diamondclubwestcoast.com",
+    "www.theguardian.com", "cointelegraph.com"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
 BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", 
-                 "zoominfo.com", "razier.app", "xing.com"]
+                 "zoominfo.com", "raizer.app", "xing.com", "people.equilar.com",
+                 "tridentconsultingme.com", "contactout.com"
+                 ]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder", "founder"}
 
@@ -134,6 +138,14 @@ def score_second_pass(text, url, state):
 
     # --- SCORING LOGIC (1-10 Scale) ---
 
+        # 4. Bonus Domains / Contact Info (+1.0)
+    for d in BONUS_DOMAINS:
+        if d in url and d not in state["domain_hits"]:
+            score += 1.0
+            breakdown.append(f"External confirmation via {d} (+1.0)")
+            breakdown.append("Public contact information likely available")
+            state["domain_hits"].add(d)
+
     # 1. Identity Confirmation (+4.0) - BIG BOOST
     # If we find "Angel Investor" in a second source, that's nearly a pass.
     if any(k in t for k in identity_keywords):
@@ -149,7 +161,7 @@ def score_second_pass(text, url, state):
 
     if any(k in t for k in seniority_keywords):
         score += 1.0
-        breakdown.append("Investment behavior language (+1.0)")
+        breakdown.append("Seniority language (+1.0)")
 
     # 3. Geography Verification (+3.0) - BIG BOOST
     if any(k in t for k in uae_keywords + mena_keywords):
@@ -158,15 +170,6 @@ def score_second_pass(text, url, state):
             score += 1.5 
             breakdown.append("Supporting geography signal (+1.5)")
             state["geo_hits"] += 1
-
-    # 4. Bonus Domains / Contact Info (+1.0)
-    # RocketReach, TheOrg, etc.
-    for d in BONUS_DOMAINS:
-        if d in url and d not in state["domain_hits"]:
-            score += 1.0
-            breakdown.append(f"External confirmation via {d} (+1.0)")
-            breakdown.append("Public contact information likely available")
-            state["domain_hits"].add(d)
 
     # Cap score at 10.0
     final_score = min(score, 10.0)
