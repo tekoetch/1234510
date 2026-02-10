@@ -23,7 +23,7 @@ blocked_urls = [
     "doubleclick.net"
 ]
 
-# --- HELPER FUNCTIONS (Restored from your snippet) ---
+# --- HELPER FUNCTIONS ---
 
 def normalize_url(url):
     return url.split("?")[0].lower().strip()
@@ -66,7 +66,7 @@ def extract_name(title):
 
 # --- SECTION 1: DISCOVERY (FIRST PASS) ---
 
-st.subheader("1. Public Lead Discovery")
+st.subheader("Public Lead Discovery")
 
 query_input = st.text_area(
     "Enter search queries (one per line)",
@@ -74,7 +74,7 @@ query_input = st.text_area(
     placeholder='"angel investor" UAE site:linkedin.com/in'
 )
 
-max_results_per_query = st.number_input("Results per query", 1, 50, 10)
+max_results_per_query = st.number_input("Results per query", 1, 50, 15)
 
 if st.button("Run Discovery"):
     queries = [q.strip() for q in query_input.split("\n") if q.strip()]
@@ -96,23 +96,18 @@ if st.button("Run Discovery"):
                 title = soft_truncate_ellipsis(r.get("title", ""))
                 snippet = soft_truncate_ellipsis(r.get("body", ""))
 
-                # Robust clean: Handle multi-person LinkedIn titles (only affect title, not snippet)
                 if " | LinkedIn" in title:
-                    # Use regex to find the first " | LinkedIn" (handling spaces/dashes)
                     match = re.search(r'(\s*[-–—]?\s*\|\s*LinkedIn)', title)
                     if match:
                         cut_idx = match.start()
                         title = title[:cut_idx + len(match.group(0))].strip()
                     else:
-                        # Fallback: Simple split if regex misses (rare)
                         parts = title.split(" | LinkedIn")
                         title = parts[0].strip() + " | LinkedIn"
                 
-                # Check Duplicates
                 if is_duplicate_url(url, st.session_state.first_pass_results, title, snippet):
                     continue
 
-                # Score
                 combined = f"{title} {snippet}"
                 score, conf, breakdown, enriched_company = score_text(combined, query, url)
                 name = extract_name(title)
@@ -120,15 +115,12 @@ if st.button("Run Discovery"):
                 if not is_valid_person_name(name):
                     continue
 
-                # Upsert Logic
                 existing_idx = find_existing_person(url, st.session_state.first_pass_results)
                 if existing_idx is not None:
                     existing = st.session_state.first_pass_results[existing_idx]
-
                     existing["Snippet"] += "\n---\n" + snippet
                     existing["Title"] = existing["Title"]
                     existing["Score"] = max(existing["Score"], score)
-
                     old_signals = set(existing["Signals"].split(" | "))
                     new_signals = set(breakdown)
                     existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
@@ -140,7 +132,6 @@ if st.button("Run Discovery"):
 
                 else:
                     st.session_state.first_pass_results.append({
-                        "Reviewed": False,
                         "Name": name,
                         "Title": title,
                         "Snippet": snippet,
@@ -160,14 +151,11 @@ EXPECTED_COLUMNS = [
 
 df_first = pd.DataFrame(st.session_state.first_pass_results)
 
-for col in EXPECTED_COLUMNS:
-    if col not in df_first.columns:
-        df_first[col] = []
-
-st.dataframe(
-    df_first[["Name", "Title", "Snippet", "Enriched Company", "Score", "Confidence", "Signals", "URL"]],
-    use_container_width=True
-)
+if not df_first.empty:
+    st.dataframe(
+        df_first[["Name", "Score", "Enriched Company", "Confidence", "Signals"]].sort_values("Score", ascending=False),
+        use_container_width=True
+    )
 
 # --- SECTION 2: VERIFICATION (SECOND PASS) ---
 
@@ -178,16 +166,14 @@ if st.button("Run Second Pass Verification"):
     if df_first.empty:
         st.error("No leads to verify.")
     else:
-        # Filter for candidates
+        # Filter: Only verify leads that scored reasonably well in Pass 1
         SECOND_PASS_THRESHOLD = 5.0
         candidates = df_first[df_first["Score"] >= SECOND_PASS_THRESHOLD]
-
         total = len(candidates)
         
         verify_progress = st.progress(0)
         status_text = st.empty()
         
-        # Track processed names to avoid re-running same session
         processed_names = {x["Name"] for x in st.session_state.second_pass_results}
         
         with DDGS(timeout=10) as ddgs:
@@ -195,17 +181,13 @@ if st.button("Run Second Pass Verification"):
                 name = row["Name"]
                 if name in processed_names: continue
 
-            for i, (_, row) in enumerate(candidates.iterrows()):
-                name = row["Name"]
-                if name in processed_names: continue
-
-                # --- HARD SKIP: Incomplete or duplicate names ---
+                # HARD SKIP: Incomplete or duplicate names
                 name_parts = name.strip().split()
                 last_name = name_parts[-1] if len(name_parts) > 1 else ""
                 first_name = name_parts[0] if len(name_parts) > 0 else ""
 
-                # 1️⃣ Single-letter last name
-                # 2️⃣ First name == last name (repeated name)
+                # Single-letter last name
+                # First name == last name (repeated name)
                 if len(name_parts) < 2 or len(last_name) == 1 or first_name.lower() == last_name.lower():
                     # Directly add to consolidation (first-pass only)
                     st.session_state.second_pass_results.append({
@@ -222,7 +204,6 @@ if st.button("Run Second Pass Verification"):
                 status_text.write(f"Verifying: **{name}** ({i+1}/{total})")
                 verify_progress.progress((i + 1) / total)
                 
-                # Setup
                 anchors = second_pass.extract_anchors(row["Snippet"])
                 queries = second_pass.build_second_pass_queries(name, anchors, row["Enriched Company"])
                 
@@ -238,52 +219,44 @@ if st.button("Run Second Pass Verification"):
                     "linkedin_hits": 0
                 }
                 
-                # Search Loop
                 seen_urls = set()
                 candidate_verified_data = []
                 
                 for q in queries:
-                    # Smart Rate Limiting: Stop if we already confirmed identity strongly
+                    # Rate Limiting / optimization
                     if state["identity_confirmed"] and state["geo_hits"] >= 1:
                         break
                         
-                    time.sleep(1.0) # Polite delay
+                    time.sleep(1.0) 
                     status_text.write(f"Querying: {q}")
 
                     try:
-                        results = list(ddgs.text(q, max_results=20, backend="html"))
+                        results = list(ddgs.text(q, max_results=20, backend="html")) 
                     except Exception: 
                         continue
                         
                     for r in results:
                         url = r.get("href", "")
                         if not url: continue
-
+                        
                         norm_url = normalize_url(url)
-                        if any(bad in norm_url for bad in blocked_urls):
-                            continue
-
-                        if url in seen_urls:
-                            continue
-
+                        if any(bad in norm_url for bad in blocked_urls): continue
+                        if url in seen_urls: continue
                         seen_urls.add(url)
 
-                        title = str(r.get('title', ''))
                         text = f"{r.get('title','')} {r.get('body','')}"
-                        score2, breakdown2, id_conf = second_pass.score_second_pass(text, url, state)
+                        score2, breakdown2, _ = second_pass.score_second_pass(text, url, state)
                         
                         if score2 > 0:
                             candidate_verified_data.append({
-                            "Name": name,
-                            "Query Used": q,
-                            "Title": title,
-                            "Snippet": text,
-                            "Second Pass Score": score2,
-                            "Score Breakdown": " | ".join(breakdown2),
-                            "Source URL": url
-                        })
+                                "Name": name,
+                                "Query Used": q,
+                                "Snippet": text,
+                                "Second Pass Score": score2,
+                                "Score Breakdown": " | ".join(breakdown2),
+                                "Source URL": url
+                            })
                             
-                # Add best results to session state
                 if candidate_verified_data:
                     st.session_state.second_pass_results.extend(candidate_verified_data)
         
@@ -296,88 +269,84 @@ if "Title" not in df_second.columns:
     df_second["Title"] = ""
 
 if not df_second.empty:
-    st.dataframe(df_second[["Name", "Query Used", "Title","Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
+    st.dataframe(df_second[["Name", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
 
-# --- SECTION 3: CONSOLIDATION (Your Logic) ---
+# --- SECTION 3: CONSOLIDATION (Fixed Logic) ---
 
 def is_address_like(text):
-    if not text:
-        return False
+    if not text: return False
     return any(k in text.lower() for k in [
         "building", "street", "road", "avenue",
         "precinct", "floor", "office", "po box"
     ])
+
 
 st.divider()
 st.subheader("3. Consolidation & Verdict")
 
 if not df_first.empty:
     consolidated = []
-    
     verified_names = set(df_second["Name"]) if not df_second.empty else set()
     all_first_pass_names = set(df_first["Name"])
 
-    # Process Verified Leads
+    # 1. Process leads that WENT THROUGH verification
     if not df_second.empty:
         for name, g in df_second.groupby("Name"):
-            # Logic: Sum raw score, cap at 6.0
-            total_raw = g["Second Pass Score"].sum()
-            total = min(total_raw, 6.0)
-
-            # Extract breakdown signals
-            all_breakdowns = [item for sublist in g["Score Breakdown"] for item in sublist]
+            # Cumulative scoring for Second Pass (capped at 10)
+            # SUM of scores, capped at 10.
+            second_pass_total = min(g["Second Pass Score"].sum(), 10.0)
             
-            investor = "Yes" if any("Confirmed investor identity" in x for x in all_breakdowns) else "No"
-            uae = "Yes" if any("geography" in x.lower() for x in all_breakdowns) else "No"
-            
-            snippets = g["Snippet"].tolist()
-            first_pass_company = df_first[df_first["Name"] == name]["Enriched Company"].dropna().iloc[0]
+            # Retrieve First Pass Score
             first_pass_row = df_first[df_first["Name"] == name].iloc[0]
+            first_pass_score = first_pass_row["Score"]
 
-            companies = set()
-            for s in snippets:
-                matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
-                for _, company in matches:
-                    companies.add(company.strip())
-
-            # Enrichment sources check
+            # Calculate FINAL AVERAGED SCORE
+            final_score = (first_pass_score + second_pass_total) / 2
+            
+            # Breakdown Analysis
+            all_breakdowns = [str(item) for sublist in g["Score Breakdown"] for item in sublist]
+            all_breakdowns_text = " ".join(all_breakdowns).lower()
+            
+            investor_confirmed = "Yes" if "investor identity" in all_breakdowns_text else "No"
+            uae_confirmed = "Yes" if "geography" in all_breakdowns_text else "No"
+            
+            # Enrichment Check
             sources = []
             if any("rocketreach.co" in url.lower() for url in g["Source URL"]):
                 sources.append("RocketReach")
             if any("zoominfo.com" in url.lower() for url in g["Source URL"]):
                 sources.append("ZoomInfo")
+            if any("yello.ae" in url.lower() for url in g["Source URL"]):
+                sources.append("Yello.ae")    
+            if any("linkedin.com/company/" in url.lower() for url in g["Source URL"]):
+                sources.append("Company information inside LinkedIn")    
 
             enriched_social = ""
             if sources:
                 enriched_social = f"Yes ({', '.join(sources)})"
-            
-            if total >= 4.5:
-                evidence_strength = "Strong"
-            elif total >= 2.5:
-                evidence_strength = "Moderate"
-            else:
-                evidence_strength = "Weak"
 
-            # Verdict Logic
-            if investor == "Yes" and uae == "Yes" and total >= 4.5:
-                verdict = "ACCEPT"
-            elif total >= 2.5:
-                verdict = "GOOD"
+            # Verdict Logic (Based on Average)
+            if final_score >= 6.5:
+                verdict = "GREAT"  # High confidence on both, or Perfect on one and good on other
+            elif final_score >= 4.5:
+                verdict = "GOOD"    # Solid lead, maybe second pass was weak but first pass was great
             else:
                 verdict = "REJECT"
 
-            final_company = first_pass_company
-
-            if not final_company:
-                clean_companies = [
-                    c for c in companies
-                    if c and not is_address_like(c)
-                ]
-                if clean_companies:
-                    final_company = ", ".join(sorted(set(clean_companies)))
+            # Company cleanup
+            snippets = g["Snippet"].tolist()
+            companies = set()
+            for s in snippets:
+                matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
+                for _, company in matches:
+                    if not is_address_like(company): companies.add(company.strip())
             
-            first_snippet = str(first_pass_row.get("Snippet", ""))
+            final_company = first_pass_row.get("Enriched Company", "")
+            if not final_company and companies:
+                final_company = ", ".join(list(companies)[:1])
 
+            first_snippet = str(first_pass_row.get("Snippet", ""))
+            
             second_snippets = ""
             if "Snippet" in g.columns:
                 second_snippets = " ".join(
@@ -391,48 +360,51 @@ if not df_first.empty:
             )
 
             if not either_have_geo_signal:
-                verdict = "REJECTED"
+                verdict = "REJECT"
                 investor = "No"
-                uae = "No"
+                uae = "No"   
 
             consolidated.append({
                 "Name": name,
-                "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
-                "Second Pass Total": round(total, 1),
-                "Evidence Rows": len(g),
-                "Investor Confirmed": investor,
-                "UAE Confirmed": uae,
+                "First Pass Score": round(first_pass_score, 1),
+                "Second Pass Score": round(second_pass_total, 1),
+                "Final Score": round(final_score, 1),
+                "Investor Confirmed": investor_confirmed,
+                "UAE Confirmed": uae_confirmed,
                 "Enriched Company": final_company,
                 "Enriched Social": enriched_social,
-                "Evidence Strength": evidence_strength,
                 "Final Verdict": verdict
             })
 
-    # Process Pending Leads
+    # 2. Process leads that were SKIPPED (Pending)
     pending_names = all_first_pass_names - verified_names
     for name in pending_names:
         row = df_first[df_first["Name"] == name].iloc[0]
-        if row["Score"] >= 5:
+        # Only show pending if they had a decent first pass score
+        if row["Score"] >= 3.8:
             consolidated.append({
                 "Name": name,
-                "First Pass Score": row["Score"],
-                "Second Pass Total": 0.0,
-                "Evidence Rows": 0,
+                "First Pass Score": round(row["Score"], 1),
+                "Second Pass Score": 0.0,
+                "Final Score": round(row["Score"] / 2, 1),
                 "Investor Confirmed": "Pending",
                 "UAE Confirmed": "Pending",
-                "Enriched Company": "",
-                "Enriched Social": "",
+                "Enriched Company": row.get("Enriched Company", ""),
+                "Enriched Social": "No",
                 "Final Verdict": "PENDING"
             })
 
     df_consolidated = pd.DataFrame(consolidated)
     
     if not df_consolidated.empty:
-        # Sort: ACCEPT/GOOD first
+        # Sort by Final Score
         st.dataframe(
-            df_consolidated.sort_values(by="Second Pass Total", ascending=False),
+            df_consolidated.sort_values(by="Final Score", ascending=False),
             use_container_width=True
         )
         
-        # Quick Metrics
-        st.metric("Green List (Accept/Good)", len(df_consolidated[df_consolidated["Final Verdict"].isin(["ACCEPT", "GOOD"])]))
+        # Metrics
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Green List (Accept)", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+        c2.metric("Good List", len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"]))
+        c3.metric("Review Pending", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
