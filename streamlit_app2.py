@@ -337,7 +337,6 @@ if not df_first.empty:
                 if clean_companies:
                     final_company = ", ".join(sorted(set(clean_companies)))
             
-            row = row.fillna("")
 
             first_snippet = str(row.get("Snippet", ""))
 
