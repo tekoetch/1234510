@@ -16,7 +16,8 @@ NOISE_DOMAINS = [
     "dubaiangelinvestors.me", "rasmal.com",
     "new-delhi.startups-list.com", "appriffy.com",
     "ycombinator.com", "kr-asia.com", "www.goswirl.ai",
-    "www.science.gov"
+    "www.science.gov", "cryptonews.com", "blog.founderfirst.org",
+    "abcnews.go.com", "www.wamda.com"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
@@ -91,7 +92,7 @@ def build_second_pass_queries(name, anchors, enriched_company=""):
 
 def score_second_pass(text, url, state):
     """
-    Scores verification results using your specific weights.
+    Scores verification results using the new 1-10 Scale.
     """
     t = text.lower()
     score = 0
@@ -106,18 +107,19 @@ def score_second_pass(text, url, state):
         return 0, ["LinkedIn directory page ignored"], False
 
     if "linkedin.com/in" in url:
+        # Check if this LinkedIn profile adds NEW info compared to first pass
         new_info = False
-
+        # We check if any significant keywords exist here that we are looking for
         for k in identity_keywords + behavior_keywords + seniority_keywords + uae_keywords + mena_keywords:
-            if k in t and k not in state["first_pass_keywords"]:
+            if k in t:
                 new_info = True
                 break
-
+        
         if not new_info:
             return 0, ["LinkedIn adds no new information"], False
         
     if "linkedin.com" in url:
-        if state["linkedin_hits"] >= 3:
+        if state["linkedin_hits"] >= 5:
             return 0, ["LinkedIn limit reached"], False
         state["linkedin_hits"] += 1
 
@@ -129,33 +131,43 @@ def score_second_pass(text, url, state):
             if state["expected_name"].lower() not in name_slug.lower():
                 return 0, ["Tracxn non-matching person ignored"], False
 
-    # --- SCORING LOGIC ---
+    # --- SCORING LOGIC (1-10 Scale) ---
 
-    # 1. Identity Confirmation (+1.5)
+    # 1. Identity Confirmation (+4.0) - BIG BOOST
+    # If we find "Angel Investor" in a second source, that's nearly a pass.
     if any(k in t for k in identity_keywords):
         if not state["identity_confirmed"]:
-            score += 1.5
-            breakdown.append("Confirmed investor identity (+1.5)")
+            score += 4.0
+            breakdown.append("Confirmed investor identity (+4.0)")
             state["identity_confirmed"] = True
 
-    # 2. Behavior Signals (+0.5)
+    # 2. Behavior Signals (+3.0) - BIG BOOST
     if any(k in t for k in behavior_keywords):
-        score += 0.5
-        breakdown.append("Investment behavior language (+0.5)")
+        score += 3.0
+        breakdown.append("Investment behavior language (+3.0)")
 
-    # 3. Geography Verification (+0.3)
+    if any(k in t for k in seniority_keywords):
+        score += 1.0
+        breakdown.append("Investment behavior language (+1.0)")
+
+    # 3. Geography Verification (+3.0) - BIG BOOST
     if any(k in t for k in uae_keywords + mena_keywords):
-        if state["geo_hits"] < 2 and state["identity_confirmed"]:
-            score += 0.3
-            breakdown.append("Supporting geography signal (+0.3)")
+        if state["geo_hits"] < 2:
+            # We allow up to 2 hits for geo to accumulate confidence
+            score += 1.5 
+            breakdown.append("Supporting geography signal (+1.5)")
             state["geo_hits"] += 1
 
-    # 4. Bonus Domains / Contact Info (+0.4)
+    # 4. Bonus Domains / Contact Info (+1.0)
+    # RocketReach, TheOrg, etc.
     for d in BONUS_DOMAINS:
         if d in url and d not in state["domain_hits"]:
-            score += 0.4
-            breakdown.append(f"External confirmation via {d} (+0.4)")
+            score += 1.0
+            breakdown.append(f"External confirmation via {d} (+1.0)")
             breakdown.append("Public contact information likely available")
             state["domain_hits"].add(d)
 
-    return min(score, 5.0), breakdown, state["identity_confirmed"]
+    # Cap score at 10.0
+    final_score = min(score, 10.0)
+    
+    return final_score, breakdown, state["identity_confirmed"]
