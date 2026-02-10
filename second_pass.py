@@ -3,7 +3,8 @@ from first_pass import (
     identity_keywords, 
     behavior_keywords, 
     uae_keywords, 
-    mena_keywords
+    mena_keywords,
+    seniority_keywords
 )
 
 # --- CONFIGURATION ---
@@ -11,11 +12,13 @@ from first_pass import (
 # Domains that are pure noise and should result in a 0 score
 NOISE_DOMAINS = [
     "wikipedia.org", "saatchiart.com", "researchgate.net", 
-    "academia.edu", "sciprofiles.com", "datapile.co"
+    "academia.edu", "sciprofiles.com", "datapile.co",
+    "www.dubaiangelinvestors.me", "www.rasmal.com",
+    "new-delhi.startups-list.com"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
-BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com"]
+BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", "www.zoominfo.com"]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder", "founder"}
 
@@ -101,7 +104,25 @@ def score_second_pass(text, url, state):
         return 0, ["LinkedIn directory page ignored"], False
 
     if "linkedin.com/in" in url:
-        return 0, ["LinkedIn profile ignored in second pass"], False
+        new_info = False
+
+        for k in identity_keywords + behavior_keywords + seniority_keywords + uae_keywords + mena_keywords:
+            if k in t and k not in state["first_pass_keywords"]:
+                new_info = True
+                break
+
+        if not new_info:
+            return 0, ["LinkedIn adds no new information"], False
+
+    
+    if "tracxn.com/d/people/" in url:
+        slug = url.split("/d/people/")[-1].split("/")[0]
+        name_slug = slug.replace("-", " ")
+
+    if state.get("expected_name"):
+        if state["expected_name"].lower() not in name_slug.lower():
+            return 0, ["Tracxn non-matching person ignored"], False
+
 
 
     # --- SCORING LOGIC ---
