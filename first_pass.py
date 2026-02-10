@@ -35,10 +35,6 @@ def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
 
-    if " | LinkedIn" in text:
-        cut_idx = text.find(" | LinkedIn")
-        text = text[: cut_idx + len(" | LinkedIn")]
-
     text_original = text
     text = text.lower()
     score = BASE_SCORE
