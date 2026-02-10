@@ -17,11 +17,12 @@ NOISE_DOMAINS = [
     "new-delhi.startups-list.com", "appriffy.com",
     "ycombinator.com", "kr-asia.com", "www.goswirl.ai",
     "www.science.gov", "cryptonews.com", "blog.founderfirst.org",
-    "abcnews.go.com", "www.wamda.com"
+    "abcnews.go.com", "www.wamda.com", "www.startupresearcher.com"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
-BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", "zoominfo.com", "razier.app"]
+BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", 
+                 "zoominfo.com", "razier.app", "xing.com"]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder", "founder"}
 
@@ -65,10 +66,6 @@ def build_second_pass_queries(name, anchors, enriched_company=""):
     # Priority 1: Name + Enriched Company (Strongest)
     if enriched_company:
          queries.append(f'{quoted_name} "{enriched_company}"')
-
-    # Priority 2: Name + Identity Keyword (e.g. "John Doe" "Angel Investor")
-    if anchors["identity"]:
-        queries.append(f'{quoted_name} "{anchors["identity"][0]}"')
     
     # Priority 3: Name + Extracted Company + "Investor"
     elif anchors["company"]:
@@ -77,6 +74,10 @@ def build_second_pass_queries(name, anchors, enriched_company=""):
     # Priority 4: Name + Behavior (e.g. "John Doe" "Portfolio")
     elif anchors["behavior"]:
         queries.append(f'{quoted_name} "{anchors["behavior"][0]}"')
+
+    # Priority 2 (temporary at 4): Name + Identity Keyword (e.g. "John Doe" "Angel Investor")
+    if anchors["identity"]:
+        queries.append(f'{quoted_name} "{anchors["identity"][0]}"')    
 
     # Always ensure we have at least one query with region
     final_queries = []
