@@ -261,7 +261,7 @@ def score_text(text, query, url=""):
         score -= 1.1
         breakdown.append("High score without geography confirmation (-1.1)")
 
-    if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in, pk.linkedin.com/in"]):
+    if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in", "pk.linkedin.com/in"]):
         score -= 0.3
         breakdown.append("Outside Region LinkedIn country domain (-0.3)")
     
