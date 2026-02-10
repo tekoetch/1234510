@@ -16,7 +16,7 @@ identity_keywords = [
 ]
 
 behavior_keywords = [
-    "invested in", "investing in", "portfolio", "Series A"
+    "invested in", "investing in", "portfolio", "Series A",
     "seed", "pre-seed", "early-stage", "funding", "summit"
     "venture capital", "private equity", "real estate",
     "fundraising", "investment portfolio", "wealth funds",
