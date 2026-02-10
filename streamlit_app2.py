@@ -5,7 +5,7 @@ import re
 import time
 
 # Import logic
-from first_pass import score_text
+from first_pass import (score_text, identity_keywords, behavior_keywords)
 import second_pass 
 
 # --- SESSION STATE SETUP ---
@@ -194,10 +194,15 @@ if st.button("Run Second Pass Verification"):
                     "linkedin_seen": False,
                     "geo_hits": 0,
                     "identity_confirmed": False,
-                    "domain_hits": set()
+                    "domain_hits": set(),
+                    "expected_name": name.lower(),
+                    "first_pass_keywords": set(
+                        identity_keywords + behavior_keywords
+                    )
                 }
                 
                 # Search Loop
+                seen_urls = set()
                 candidate_verified_data = []
                 
                 for q in queries:
@@ -220,6 +225,12 @@ if st.button("Run Second Pass Verification"):
                         norm_url = normalize_url(url)
                         if any(bad in norm_url for bad in blocked_urls):
                             continue
+
+                        if url in seen_urls:
+                            continue
+
+                        seen_urls.add(url)
+
                         
                         text = f"{r.get('title','')} {r.get('body','')}"
                         score2, breakdown2, id_conf = second_pass.score_second_pass(text, url, state)
@@ -248,6 +259,14 @@ if not df_second.empty:
 
 # --- SECTION 3: CONSOLIDATION (Your Logic) ---
 
+def is_address_like(text):
+    if not text:
+        return False
+    return any(k in text.lower() for k in [
+        "building", "street", "road", "avenue",
+        "precinct", "floor", "office", "po box"
+    ])
+
 st.divider()
 st.subheader("3. Consolidation & Verdict")
 
@@ -271,6 +290,8 @@ if not df_first.empty:
             uae = "Yes" if any("geography" in x.lower() for x in all_breakdowns) else "No"
             
             snippets = g["Snippet"].tolist()
+            first_pass_company = df_first[df_first["Name"] == name]["Enriched Company"].dropna().iloc[0]
+
             companies = set()
             for s in snippets:
                 matches = re.findall(r"\b(at|with)\s+([A-Z][A-Za-z0-9 &]{3,})", s)
@@ -295,6 +316,16 @@ if not df_first.empty:
             else:
                 verdict = "REJECT"
 
+            final_company = first_pass_company
+
+            if not final_company:
+                clean_companies = [
+                    c for c in companies
+                    if c and not is_address_like(c)
+                ]
+                if clean_companies:
+                    final_company = ", ".join(sorted(set(clean_companies)))
+    
             consolidated.append({
                 "Name": name,
                 "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
@@ -302,7 +333,7 @@ if not df_first.empty:
                 "Evidence Rows": len(g),
                 "Investor Confirmed": investor,
                 "UAE Confirmed": uae,
-                "Enriched Company": ", ".join(sorted(companies)),
+                "Enriched Company": final_company,
                 "Enriched Social": "Yes (RocketReach)" if has_rocketreach else "",
                 "Evidence Strength": evidence_strength,
                 "Final Verdict": verdict
