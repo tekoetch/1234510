@@ -218,7 +218,7 @@ if st.button("Run Second Pass Verification"):
                     if state["identity_confirmed"] and state["geo_hits"] >= 1:
                         break
                         
-                    time.sleep(1.0) # Polite delay
+                    time.sleep(0.5) # Polite delay
                     status_text.write(f"Querying: {q}")
 
                     try:
@@ -239,6 +239,7 @@ if st.button("Run Second Pass Verification"):
 
                         seen_urls.add(url)
 
+                        title = str(r.get('title', ''))
                         text = f"{r.get('title','')} {r.get('body','')}"
                         score2, breakdown2, id_conf = second_pass.score_second_pass(text, url, state)
                         
