@@ -336,11 +336,18 @@ if not df_first.empty:
                 ]
                 if clean_companies:
                     final_company = ", ".join(sorted(set(clean_companies)))
+            
+            row = row.fillna("")
 
-            geo_text = " ".join([
-                str(row["Snippet"]),
-                " ".join(g["Snippet"] for g in g if "Snippet" in g)
-            ]).lower()
+            first_snippet = str(row.get("Snippet", ""))
+
+            second_snippets = ""
+            if "Snippet" in g.columns:
+                second_snippets = " ".join(
+                    str(s) for s in g["Snippet"].dropna().tolist()
+                )
+
+            geo_text = f"{first_snippet} {second_snippets}".lower()
 
             either_have_geo_signal = any(
                 k in geo_text for k in (uae_keywords + mena_keywords)
