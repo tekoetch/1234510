@@ -12,27 +12,32 @@ GEO_GROUP_BONUS = 0.6
 identity_keywords = [
     "angel investor", "angel investing", "family office",
     "venture partner", "chief investment officer", "cio",
-    "founder", "co-founder", "ceo", "incubator"
+    "founder", "co-founder", "ceo", "incubator", "angel"
 ]
 
 behavior_keywords = [
-    "invested in", "investing in", "portfolio",
-    "seed", "pre-seed", "early-stage", "funding",
+    "invested in", "investing in", "portfolio", "Series A"
+    "seed", "pre-seed", "early-stage", "funding", "summit"
     "venture capital", "private equity", "real estate",
-    "fundraising", "investment portfolio", "wealth funds"
+    "fundraising", "investment portfolio", "wealth funds",
+    "property management", "dedicated portfolio"
 ]
 
 seniority_keywords = [
     "partner", "managing director", "chairman",
-    "board member", "advisor", "advisory"
+    "board member", "advisor", "advisory", "chair"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
-mena_keywords = ["mena", "middle east", "gulf"]
+mena_keywords = ["mena", "middle east", "gulf", "gcc"]
 
 def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
+
+    if " | LinkedIn" in text:
+        cut_idx = text.find(" | LinkedIn")
+        text = text[: cut_idx + len(" | LinkedIn")]
 
     text_original = text
     text = text.lower()
@@ -79,7 +84,7 @@ def score_text(text, query, url=""):
         if any(k in loc for k in uae_keywords + mena_keywords):
             score += 0.5
             breakdown.append("Explicit UAE location (+0.5)")
-        elif any(bad in loc for bad in ["Singapore", "New York", "United States", "UK", "London" "India"]):
+        elif any(bad in loc for bad in ["Singapore", "New York City", "United States", "UK", "London" "India"]):
             score -= 1.5 
             breakdown.append("Non-MENA location detected (-1.5)")
 
@@ -253,10 +258,10 @@ def score_text(text, query, url=""):
         score += GEO_GROUP_BONUS
         breakdown.append("UAE LinkedIn domain (+0.6)")
     elif score >= 5.0 and "Geography" not in signal_groups:
-        score -= 1.0
-        breakdown.append("High score without geography confirmation (-0.5)")
+        score -= 1.1
+        breakdown.append("High score without geography confirmation (-1.1)")
 
-    if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in"]):
+    if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in, pk.linkedin.com/in"]):
         score -= 0.3
         breakdown.append("Outside Region LinkedIn country domain (-0.3)")
     
