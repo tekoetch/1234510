@@ -183,13 +183,30 @@ if st.button("Run Second Pass Verification"):
                 name = row["Name"]
                 if name in processed_names: continue
 
-                # --- HARD SKIP: Incomplete names (single-letter last name) ---
-                name_parts = name.strip().split()
+            for i, (_, row) in enumerate(candidates.iterrows()):
+                name = row["Name"]
+                if name in processed_names: continue
 
-                if len(name_parts) < 2 or len(name_parts[-1]) == 1:
-                    # Send directly to consolidation, never second pass
+                # --- HARD SKIP: Incomplete or duplicate names ---
+                name_parts = name.strip().split()
+                last_name = name_parts[-1] if len(name_parts) > 1 else ""
+                first_name = name_parts[0] if len(name_parts) > 0 else ""
+
+                # 1️⃣ Single-letter last name
+                # 2️⃣ First name == last name (repeated name)
+                if len(name_parts) < 2 or len(last_name) == 1 or first_name.lower() == last_name.lower():
+                    # Directly add to consolidation (first-pass only)
+                    st.session_state.second_pass_results.append({
+                        "Name": name,
+                        "Query Used": "",
+                        "Title": row.get("Title",""),
+                        "Snippet": row.get("Snippet",""),
+                        "Second Pass Score": 0.0,
+                        "Score Breakdown": "Skipped second pass due to incomplete / common name",
+                        "Source URL": row.get("URL","")
+                    })
                     continue
-                
+
                 status_text.write(f"Verifying: **{name}** ({i+1}/{total})")
                 verify_progress.progress((i + 1) / total)
                 
@@ -218,7 +235,7 @@ if st.button("Run Second Pass Verification"):
                     if state["identity_confirmed"] and state["geo_hits"] >= 1:
                         break
                         
-                    time.sleep(0.5) # Polite delay
+                    time.sleep(1.0) # Polite delay
                     status_text.write(f"Querying: {q}")
 
                     try:
