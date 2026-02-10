@@ -5,7 +5,7 @@ import re
 import time
 
 # Import logic
-from first_pass import (score_text, identity_keywords, behavior_keywords)
+from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
 
 # --- SESSION STATE SETUP ---
@@ -182,6 +182,13 @@ if st.button("Run Second Pass Verification"):
             for i, (_, row) in enumerate(candidates.iterrows()):
                 name = row["Name"]
                 if name in processed_names: continue
+
+                # --- HARD SKIP: Incomplete names (single-letter last name) ---
+                name_parts = name.strip().split()
+
+                if len(name_parts) < 2 or len(name_parts[-1]) == 1:
+                    # Send directly to consolidation, never second pass
+                    continue
                 
                 status_text.write(f"Verifying: **{name}** ({i+1}/{total})")
                 verify_progress.progress((i + 1) / total)
@@ -198,7 +205,8 @@ if st.button("Run Second Pass Verification"):
                     "expected_name": name.lower(),
                     "first_pass_keywords": set(
                         identity_keywords + behavior_keywords
-                    )
+                    ),
+                    "linkedin_hits": 0
                 }
                 
                 # Search Loop
@@ -239,6 +247,7 @@ if st.button("Run Second Pass Verification"):
                             candidate_verified_data.append({
                             "Name": name,
                             "Query Used": q,
+                            "Title": title,
                             "Snippet": text,
                             "Second Pass Score": score2,
                             "Score Breakdown": " | ".join(breakdown2),
@@ -255,7 +264,7 @@ if st.button("Run Second Pass Verification"):
 df_second = pd.DataFrame(st.session_state.second_pass_results)
 
 if not df_second.empty:
-    st.dataframe(df_second[["Name", "Query Used", "Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
+    st.dataframe(df_second[["Name", "Query Used", "Title","Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
 
 # --- SECTION 3: CONSOLIDATION (Your Logic) ---
 
@@ -325,7 +334,21 @@ if not df_first.empty:
                 ]
                 if clean_companies:
                     final_company = ", ".join(sorted(set(clean_companies)))
-    
+
+            geo_text = " ".join([
+                str(row["Snippet"]),
+                " ".join(g["Snippet"] for g in g if "Snippet" in g)
+            ]).lower()
+
+            either_have_geo_signal = any(
+                k in geo_text for k in (uae_keywords + mena_keywords)
+            )
+
+            if not either_have_geo_signal:
+                verdict = "REJECTED"
+                investor = "No"
+                uae = "No"
+
             consolidated.append({
                 "Name": name,
                 "First Pass Score": df_first[df_first["Name"] == name]["Score"].max(),
