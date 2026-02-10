@@ -251,7 +251,6 @@ if st.button("Run Second Pass Verification"):
                             candidate_verified_data.append({
                                 "Name": name,
                                 "Query Used": q,
-                                "Title:": r.get('title,' ''),
                                 "Snippet": text,
                                 "Second Pass Score": score2,
                                 "Score Breakdown": " | ".join(breakdown2),
@@ -266,11 +265,8 @@ if st.button("Run Second Pass Verification"):
 
 df_second = pd.DataFrame(st.session_state.second_pass_results)
 
-if "Title" not in df_second.columns:
-    df_second["Title"] = ""
-
 if not df_second.empty:
-    st.dataframe(df_second[["Name", "Query Used", "Title","Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
+    st.dataframe(df_second[["Name", "Query Used", "Snippet", "Second Pass Score", "Score Breakdown", "Source URL"]], use_container_width=True)
 
 # --- SECTION 3: CONSOLIDATION (Fixed Logic) ---
 
@@ -326,9 +322,9 @@ if not df_first.empty:
                 enriched_social = f"Yes ({', '.join(sources)})"
 
             # Verdict Logic (Based on Average)
-            if final_score >= 6.5:
+            if final_score >= 8.4:
                 verdict = "GREAT"  # High confidence on both, or Perfect on one and good on other
-            elif final_score >= 4.5:
+            elif final_score >= 5.0:
                 verdict = "GOOD"    # Solid lead, maybe second pass was weak but first pass was great
             else:
                 verdict = "REJECT"
