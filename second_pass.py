@@ -125,11 +125,9 @@ def score_second_pass(text, url, state):
         slug = url.split("/d/people/")[-1].split("/")[0]
         name_slug = slug.replace("-", " ")
 
-    if state.get("expected_name"):
-        if state["expected_name"].lower() not in name_slug.lower():
-            return 0, ["Tracxn non-matching person ignored"], False
-
-
+        if state.get("expected_name"):
+            if state["expected_name"].lower() not in name_slug.lower():
+                return 0, ["Tracxn non-matching person ignored"], False
 
     # --- SCORING LOGIC ---
 
