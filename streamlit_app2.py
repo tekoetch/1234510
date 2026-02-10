@@ -405,6 +405,6 @@ if not df_first.empty:
         
         # Metrics
         c1, c2, c3 = st.columns(3)
-        c1.metric("Green List (Accept)", len(df_consolidated[df_consolidated["Final Verdict"] == "ACCEPT"]))
+        c1.metric("Green List (Accept)", len(df_consolidated[df_consolidated["Final Verdict"] == "GREAT"]))
         c2.metric("Good List", len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"]))
         c3.metric("Review Pending", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
