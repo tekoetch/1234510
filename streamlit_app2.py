@@ -302,6 +302,7 @@ if not df_first.empty:
             
             snippets = g["Snippet"].tolist()
             first_pass_company = df_first[df_first["Name"] == name]["Enriched Company"].dropna().iloc[0]
+            first_pass_row = df_first[df_first["Name"] == name].iloc[0]
 
             companies = set()
             for s in snippets:
@@ -337,8 +338,7 @@ if not df_first.empty:
                 if clean_companies:
                     final_company = ", ".join(sorted(set(clean_companies)))
             
-
-            first_snippet = str(row.get("Snippet", ""))
+            first_snippet = str(first_pass_row.get("Snippet", ""))
 
             second_snippets = ""
             if "Snippet" in g.columns:
