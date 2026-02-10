@@ -251,6 +251,7 @@ if st.button("Run Second Pass Verification"):
                             candidate_verified_data.append({
                                 "Name": name,
                                 "Query Used": q,
+                                "Title:": r.get('title,' ''),
                                 "Snippet": text,
                                 "Second Pass Score": score2,
                                 "Score Breakdown": " | ".join(breakdown2),
@@ -304,8 +305,7 @@ if not df_first.empty:
             final_score = (first_pass_score + second_pass_total) / 2
             
             # Breakdown Analysis
-            all_breakdowns = [str(item) for sublist in g["Score Breakdown"] for item in sublist]
-            all_breakdowns_text = " ".join(all_breakdowns).lower()
+            all_breakdowns_text = " | ".join(g["Score Breakdown"].astype(str)).lower()
             
             investor_confirmed = "Yes" if "investor identity" in all_breakdowns_text else "No"
             uae_confirmed = "Yes" if "geography" in all_breakdowns_text else "No"
