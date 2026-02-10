@@ -239,7 +239,7 @@ if st.button("Run Second Pass Verification"):
 
                         seen_urls.add(url)
 
-                        
+                        title = f"{r.get('title')}"
                         text = f"{r.get('title','')} {r.get('body','')}"
                         score2, breakdown2, id_conf = second_pass.score_second_pass(text, url, state)
                         
