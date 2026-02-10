@@ -13,12 +13,14 @@ from first_pass import (
 NOISE_DOMAINS = [
     "wikipedia.org", "saatchiart.com", "researchgate.net", 
     "academia.edu", "sciprofiles.com", "datapile.co",
-    "www.dubaiangelinvestors.me", "www.rasmal.com",
-    "new-delhi.startups-list.com"
+    "dubaiangelinvestors.me", "rasmal.com",
+    "new-delhi.startups-list.com", "appriffy.com",
+    "ycombinator.com", "kr-asia.com", "www.goswirl.ai",
+    "www.science.gov"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
-BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", "www.zoominfo.com"]
+BONUS_DOMAINS = ["theorg.com", "rocketreach.co", "crunchbase.com", "pitchbook.com", "zoominfo.com", "razier.app"]
 
 QUERY_BLOCKLIST = {"partner", "ceo", "co-founder", "founder"}
 
@@ -113,8 +115,12 @@ def score_second_pass(text, url, state):
 
         if not new_info:
             return 0, ["LinkedIn adds no new information"], False
+        
+    if "linkedin.com" in url:
+        if state["linkedin_hits"] >= 3:
+            return 0, ["LinkedIn limit reached"], False
+        state["linkedin_hits"] += 1
 
-    
     if "tracxn.com/d/people/" in url:
         slug = url.split("/d/people/")[-1].split("/")[0]
         name_slug = slug.replace("-", " ")
