@@ -140,11 +140,19 @@ def run_dashboard():
         # --- Final Presentation Table ---
         st.subheader("Extracted Lead Intelligence")
         
-        # Removed Final Score column as requested
         st.dataframe(
             df[["Name", "Identity", "Seniority", "Geography", "Verdict"]].sort_values("Verdict"),
             use_container_width=True,
             column_config={
                 "Verdict": st.column_config.TextColumn("Status")
             }
+        )
+
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="Download Your Leads Sheet",
+            data=csv_data,
+            file_name="TekhLeads Leads List.csv",
+            mime="text/csv"
         )
