@@ -98,13 +98,11 @@ def build_feature_vector(fp_signals, sp_signals, expected_columns=None):
 
 
 def run_ml_trainer():
-    st.title("Investor ML Trainer")
-    st.write("Generate a labeling sheet, score it manually, and train a custom model.")
+    st.title("machine learning training")
 
-    st.header("Step 1: Generate labeling sheet")
+    st.header("Generate sheet")
 
     raw_file = st.file_uploader(
-        "Upload CSV with Title, Snippet, URL",
         type=["csv"]
     )
 
@@ -159,7 +157,7 @@ def run_ml_trainer():
         )
 
     st.divider()
-    st.header("Step 2: Train ML model")
+    st.header("AI training module")
     labeled_file = st.file_uploader("Upload labeled CSV", type=["csv"])
 
     if labeled_file and st.button("Train Model"):
