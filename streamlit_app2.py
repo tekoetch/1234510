@@ -446,17 +446,17 @@ else:
             
                 consolidated.append({
                     "Name": name,
-                    "First Pass Score": round(first_pass_score, 1),
-                    "Second Pass Score": round(second_pass_total, 1),
-                    "Final Score": round(final_score, 1),
-                    "ML_Identity": round(ml_id, 1),
-                    "ML_Behavior": round(ml_beh, 1),
-                    "ML_Geo": round(ml_geo, 1),
-                    "ML_Final_Score": ml_avg,
+                    #"ML_Behavior": round(ml_beh, 1),
+                    #"ML_Geo": round(ml_geo, 1),
+                    #"ML_Final_Score": ml_avg,
                     "Investor Confirmed": investor_confirmed,
                     "UAE Confirmed": uae_confirmed,
                     "Enriched Company": final_company,
                     "Enriched Social": enriched_social,
+                    "First Pass Score": round(first_pass_score, 1),
+                    "Second Pass Score": round(second_pass_total, 1),
+                    "Final Score": round(final_score, 1),
+                    "AI Powered Score": round(ml_id, 1),
                     "Final Verdict": verdict
                 })
 
