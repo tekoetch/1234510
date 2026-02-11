@@ -363,7 +363,7 @@ else:
                 if any("yello.ae" in url.lower() for url in g["Source URL"]):
                     sources.append("Yello.ae")    
                 if any("linkedin.com/company/" in url.lower() for url in g["Source URL"]):
-                    sources.append("Company information inside LinkedIn")    
+                    sources.append("Company information inside LinkedIn")
 
                 enriched_social = ""
                 if sources:
@@ -439,6 +439,14 @@ else:
                         feature_columns
                     )
 
+                    # Debug: Show signals and active features for this name
+                    st.write(f"Debug for {name}:")
+                    st.write("FP Signals:", fp_signals_list)
+                    st.write("SP Signals:", sp_signals_list)
+                    active_feats = df_input.columns[df_input.iloc[0] > 0].tolist()
+                    st.write("Active Features:", active_feats)
+                    st.write("Input Vector Sample:", df_input.iloc[0].to_dict()) 
+                    
                     preds = ml_brain.predict(df_input)[0]
                     ml_id, ml_beh, ml_geo = np.clip(preds, 1, 10)
                     ml_avg = round((ml_id + ml_beh + ml_geo) / 3, 1)
