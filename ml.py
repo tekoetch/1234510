@@ -103,7 +103,7 @@ def run_ml_trainer():
     st.header("Generate sheet")
 
     raw_file = st.file_uploader(
-        "CSV FORMAT"
+        "CSV FORMAT",
         type=["csv"]
     )
 
