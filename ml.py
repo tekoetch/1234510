@@ -28,7 +28,6 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
         est_id = 9
     elif any(k in t_val for k in ["ceo", "private equity", "partner", "incubator", "angel", "founder", "co-founder"]):
         est_id = 8
-    # Substring check in signal list (Fixed)
     elif any("Identity" in clean_signal(str(s)) for s in fp_signals):
         est_id = 7
     
@@ -36,7 +35,6 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
     est_beh = 1
     if any(k in combined_text for k in ["portfolio", "invested in", "funding", "exits", "series a", "seed"]):
         est_beh = 8
-    # Substring check in signal list (Fixed)
     elif any("Behavior" in clean_signal(str(s)) for s in fp_signals) or any("Behavior" in clean_signal(str(s)) for s in sp_signals):
         est_beh = 7
     elif sp_score > 3.0: 
@@ -48,11 +46,10 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
         est_geo = 10
     elif any(k in combined_text for k in ["middle east", "emirates", "mena", "gcc"]):
         est_geo = 9
-    # Substring check in signal list (Fixed)
     elif any("Geography" in clean_signal(str(s)) for s in fp_signals) or any("Geography" in clean_signal(str(s)) for s in sp_signals):
         est_geo = 8
-    elif any("UAE LinkedIn domain (+0.6)" in clean_signal(str(s)) for s in fp_signals):
-        est_geo = 7    
+    elif any("UAE LinkedIn domain" in clean_signal(str(s)) for s in fp_signals):
+        est_geo = 7   
     
     # Penalty for mismatch
     if any(k in combined_text for k in ["new york", "london", "india", "united states"]):
