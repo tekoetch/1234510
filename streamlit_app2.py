@@ -6,15 +6,20 @@ import time
 import joblib
 import numpy as np
 
-ml_brain = None
-try:
-    ml_brain = joblib.load("model.pkl")
-except:
-    st.warning("ML model not found. ML predictions will be skipped.")
-
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
 from ml import run_ml_trainer, extract_binary_features
+
+ml_brain = None
+feature_columns = None
+
+try:
+    model_package = joblib.load("model.pkl")
+    ml_brain = model_package["model"]
+    feature_columns = model_package["feature_columns"]
+except:
+    ml_brain = None
+
 
 if "first_pass_results" not in st.session_state:
     st.session_state.first_pass_results = []
@@ -77,6 +82,28 @@ else:
             if sep in title:
                 return title.split(sep)[0].strip()
         return title.strip()
+    
+    def clean_key(text):
+        return text.strip().upper().replace(" ", "_")
+
+    def build_feature_vector(fp_signals, sp_signals, expected_columns):
+        features = {}
+
+        for sig in fp_signals:
+            key = f"FP_HAS_{clean_key(sig)}"
+            features[key] = 1
+
+        for sig in sp_signals:
+            key = f"SP_HAS_{clean_key(sig)}"
+            features[key] = 1
+
+        df = pd.DataFrame([features]).fillna(0)
+
+        for col in expected_columns:
+            if col not in df.columns:
+                df[col] = 0
+
+        return df[expected_columns]
 
     # FIRST PASS
 
@@ -376,41 +403,44 @@ else:
 
                 # --- ML Prediction Logic ---
                 ml_id, ml_beh, ml_geo, ml_avg = 0.0, 0.0, 0.0, 0.0
-                if ml_brain:
-                    # Prepare binary features like in training
-                    fp_signals_raw = str(first_pass_row.get("FP_Signals", ""))
-                    fp_signals_list = [s.strip() for s in fp_signals_raw.split(",") if s.strip()]
+
+                if ml_brain and feature_columns:
+
+                    # Extract clean signal lists
+                    fp_signals_list = []
+                    sp_signals_list = []
+
+                    if "FP_Signals" in g.columns:
+                        fp_signals_list = list(
+                            set(
+                                s.strip()
+                                for row in g["FP_Signals"].dropna()
+                                for s in str(row).split(",")
+                                if s.strip()
+                            )
+                        )
 
                     if "SP_Signals" in g.columns:
                         sp_signals_list = list(
-                            set().union(*g["SP_Signals"].astype(str).str.split(",").tolist())
+                            set(
+                                s.strip()
+                                for row in g["SP_Signals"].dropna()
+                                for s in str(row).split(",")
+                                if s.strip()
+                            )
                         )
-                    else:
-                        sp_signals_list = []
 
-                    feats = {}
-                    for sig in fp_signals_list:
-                        feats[f"FP_HAS_{sig.strip().upper().replace(' ', '_')}"] = 1
-                    for sig in sp_signals_list:
-                        feats[f"SP_HAS_{sig.strip().upper().replace(' ', '_')}"] = 1
-                    feats["FP_Score"] = first_pass_score
-                    feats["SP_Score"] = second_pass_total
-
-                    df_input = pd.DataFrame([feats]).fillna(0)
-
-                    # Ensure columns match training model
-                    if hasattr(ml_brain, "estimators_"):  # MultiOutputRegressor
-                        base_model = ml_brain.estimators_[0]
-                        if hasattr(base_model, "feature_names_in_"):
-                            for col in base_model.feature_names_in_:
-                                if col not in df_input.columns:
-                                    df_input[col] = 0
-                            df_input = df_input[base_model.feature_names_in_]
+                    df_input = build_feature_vector(
+                        fp_signals_list,
+                        sp_signals_list,
+                        feature_columns
+                    )
 
                     preds = ml_brain.predict(df_input)[0]
-                    ml_id, ml_beh, ml_geo = np.clip(preds, 1, 10)
-                    ml_avg = round((ml_id + ml_beh + ml_geo) / 3, 1)    
 
+                    ml_id, ml_beh, ml_geo = np.clip(preds, 1, 10)
+                    ml_avg = round((ml_id + ml_beh + ml_geo) / 3, 1)
+            
                 consolidated.append({
                     "Name": name,
                     "First Pass Score": round(first_pass_score, 1),
