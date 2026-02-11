@@ -530,4 +530,4 @@ else:
             c1, c2 = st.columns(2)
             total_count = len(df_consolidated[df_consolidated["Final Verdict"] == "GREAT"]) + len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"])
             c1.metric("Green List", total_count)
-            c2.metric("Review Pending/Discarded", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
+            c2.metric("Review Pending", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
