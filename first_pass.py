@@ -12,7 +12,8 @@ GEO_GROUP_BONUS = 0.6
 identity_keywords = [
     "angel investor", "angel investing", "family office",
     "venture partner", "chief investment officer", "cio",
-    "founder", "co-founder", "ceo", "incubator", "angel"
+    "founder", "co-founder", "ceo", "incubator", "angel",
+    "vc investor"
 ]
 
 behavior_keywords = [
