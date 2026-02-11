@@ -8,7 +8,7 @@ import numpy as np
 
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
-from ml import run_ml_trainer, extract_binary_features
+import ml
 
 ml_brain = None
 feature_columns = None
