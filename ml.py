@@ -14,6 +14,50 @@ def extract_name(title):
             return title.split(sep)[0].strip()
     return title.strip()
 
+# --- HEURISTIC AUTO-FILL LOGIC ---
+def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
+
+    # IDENTITY ESTIMATE
+    est_id = 1
+    # Strong signals
+    if any(k in row.get('Title','').lower() for k in ["angel investor", "founding partner", "managing partner"]):
+        est_id = 9
+    elif any(k in row.get('Title','').lower() for k in ["investor", "venture capital", "private equity"]):
+        est_id = 7
+    # Keyword boosts
+    elif "Identity" in fp_signals:
+        est_id = 6
+    
+    # BEHAVIOR ESTIMATE
+    est_beh = 1
+    # Look for active words in snippets
+    combined_text = (row.get('Snippet', '') + " " + row.get('Pass_2_Text', '')).lower()
+    if any(k in combined_text for k in ["portfolio", "invested in", "ticket size", "exits"]):
+        est_beh = 8
+    elif "Behavior" in fp_signals or "Behavior" in sp_signals:
+        est_beh = 6
+    elif sp_score > 3.0: # If second pass found something relevant
+        est_beh = 5
+
+    # GEOGRAPHY ESTIMATE
+    est_geo = 1
+    # Explicit city mentions are gold
+    if any(k in combined_text for k in ["dubai", "abu dhabi", "riyadh"]):
+        est_geo = 10
+    elif any(k in combined_text for k in ["uae", "emirates", "mena", "gcc"]):
+        est_geo = 8
+    elif "Geography" in fp_signals:
+        est_geo = 7
+    elif "Geography" in sp_signals:
+        est_geo = 6
+    
+    # Penalties for clearly wrong locations
+    if any(k in combined_text for k in ["new york", "london", "singapore", "india", "united states"]):
+        if est_geo < 8: # Only penalize if not explicitly also mentioning Dubai
+            est_geo = 2
+
+    return est_id, est_beh, est_geo
+
 def extract_binary_features(fp_signals, sp_signals):
     features = {}
 
@@ -73,6 +117,8 @@ def run_ml_trainer():
             # ---- Binary ML features ----
             binary_feats = extract_binary_features(fp_signals, sp_signals)
 
+            est_id, est_beh, est_geo = estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals)
+
             # ---- Final row ----
             entry = {
                 "Name": name,
@@ -84,11 +130,10 @@ def run_ml_trainer():
                 "FP_Signals": ", ".join(fp_signals),
                 "SP_Signals": ", ".join(sp_signals),
                 **binary_feats,
-                # Manual labels (you fill later)
-                "LABEL_Identity": 1,
-                "LABEL_Behavior": 1,
-                "LABEL_Geo": 1,
-                "LABEL_Contact": 1
+                # Manual labels 
+                "LABEL_Identity": est_id,
+                "LABEL_Behavior": est_beh,
+                "LABEL_Geo": est_geo
             }
 
             rows.append(entry)
@@ -120,7 +165,6 @@ def run_ml_trainer():
             "LABEL_Identity",
             "LABEL_Behavior",
             "LABEL_Geo",
-            "LABEL_Contact"
         ]
 
         X = data.drop(columns=label_cols)
