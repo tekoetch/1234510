@@ -406,7 +406,7 @@ else:
             )
             
             # Metrics
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Green List (Accept)", len(df_consolidated[df_consolidated["Final Verdict"] == "GREAT"]))
-            c2.metric("Good List", len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"]))
-            c3.metric("Review Pending", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
+            c1, c2 = st.columns(3)
+            total_count = len(df_consolidated[df_consolidated["Final Verdict"] == "GREAT"]) + len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"])
+            c1.metric("Green List", total_count, color="green")
+            c2.metric("Review Pending/Discarded", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
