@@ -7,7 +7,7 @@ from sklearn.multioutput import MultiOutputRegressor
 
 import first_pass
 import second_pass
-from first_pass import extract_name
+from streamlit_app2 import extract_name
 
 def extract_binary_features(fp_signals, sp_signals):
     features = {}
