@@ -85,16 +85,23 @@ else:
     
     def clean_key(text):
         return text.strip().upper().replace(" ", "_")
+    
+    def clean_signal(text):
+        if "(+" in text:
+            return text.split("(+")[0].strip()
+        return text.strip()
 
     def build_feature_vector(fp_signals, sp_signals, expected_columns):
         features = {}
 
         for sig in fp_signals:
-            key = f"FP_HAS_{clean_key(sig)}"
+            cleaned = clean_signal(sig)
+            key = f"FP_HAS_{clean_key(cleaned)}"
             features[key] = 1
 
         for sig in sp_signals:
-            key = f"SP_HAS_{clean_key(sig)}"
+            cleaned = clean_signal(sig)
+            key = f"SP_HAS_{clean_key(cleaned)}"
             features[key] = 1
 
         df = pd.DataFrame([features]).fillna(0)
@@ -401,7 +408,7 @@ else:
                     investor = "No"
                     uae = "No"   
 
-                # --- ML Prediction Logic ---
+                # ML Prediction Logic
                 ml_id, ml_beh, ml_geo, ml_avg = 0.0, 0.0, 0.0, 0.0
 
                 if ml_brain and feature_columns:
@@ -410,25 +417,12 @@ else:
                     fp_signals_list = []
                     sp_signals_list = []
 
-                    if "FP_Signals" in g.columns:
-                        fp_signals_list = list(
-                            set(
-                                s.strip()
-                                for row in g["FP_Signals"].dropna()
-                                for s in str(row).split(",")
-                                if s.strip()
-                            )
-                        )
+                    # Get FP signals from first_pass_row (not from g)
+                    fp_signals = str(first_pass_row.get("Signals", ""))
+                    fp_signals_list = list(set(clean_signal(s) for s in fp_signals.split(" | ") if s.strip()))
 
-                    if "SP_Signals" in g.columns:
-                        sp_signals_list = list(
-                            set(
-                                s.strip()
-                                for row in g["SP_Signals"].dropna()
-                                for s in str(row).split(",")
-                                if s.strip()
-                            )
-                        )
+                    # Get SP signals from g["Score Breakdown"]
+                    sp_signals_list = list(set(clean_signal(s) for row in g["Score Breakdown"].dropna() for s in str(row).split(" | ") if s.strip()))
 
                     df_input = build_feature_vector(
                         fp_signals_list,
