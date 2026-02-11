@@ -13,12 +13,7 @@ def inject_SaaS_theme():
         .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         
         /* Badge UI */
-        .keyword-badge {
-            background-color: #E0E7FF; color: #4338CA;
-            padding: 2px 8px; border-radius: 12px;
-            font-size: 0.75rem; font-weight: 600; margin: 2px;
-            display: inline-block; border: 1px solid #C7D2FE;
-        }
+.keyword-badge { background-color: #E0E7FF; color: #1e1b4b; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin: 2px; display: inline-block; border: 1px solid #C7D2FE; }
         </style>
     """, unsafe_allow_html=True)
 
