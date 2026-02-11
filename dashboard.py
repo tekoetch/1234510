@@ -46,7 +46,7 @@ def extract_found_keywords(text, keyword_list):
 
 def run_dashboard():
     inject_custom_css()
-    st.title("Leads dashboard")
+    st.title("TekhLeads Investor Discovery")
 
     if 'all_leads' not in st.session_state:
         st.session_state['all_leads'] = []
@@ -130,10 +130,10 @@ def run_dashboard():
         qualified_count = len(df[df['Verdict'].isin(['GREAT', 'GOOD'])])
         m2.metric("Qualified Leads", qualified_count)
         
-        m3.metric("Review Required", len(df[df['Verdict'] == 'GOOD']))
+        m3.metric("Low Quality Leads", len(df[df['Verdict'] == 'GOOD']))
 
         # --- Filters ---
-        show_green = st.toggle("Show Finalists Only", value=False)
+        show_green = st.toggle("Show Green List Only", value=False)
         if show_green:
             df = df[df['Verdict'].isin(['GREAT', 'GOOD'])]
 
