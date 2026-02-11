@@ -44,38 +44,58 @@ def run_dashboard():
     if 'all_leads' not in st.session_state:
         st.session_state['all_leads'] = []
 
-    # Layout for Input
-    c1, c2 = st.columns([3, 1])
-    query = c1.text_input("Enter Search Keywords (e.g., 'Angel Investors Dubai')", placeholder="Dubai Venture Capitalists...")
-    run_btn = c2.button("Run Deep Discovery")
+    # Layout for Input - Replaced text input with a specific button
+    st.write("Click to run automated discovery for specific segments:")
+    run_angel_search = st.button("Angel Investors")
 
-    if run_btn and query:
+    if run_angel_search:
+        # Fixed query and limit per instructions
+        query = '"angel investor" UAE site:linkedin.com/in'
+        limit = 10
+        
         progress_bar = st.progress(0)
         log_area = st.empty()
         
         with DDGS() as ddgs:
             log_area.info(f"🔍 Executing global search for: {query}...")
-            # Limit to 15 for a fast demo
-            search_results = list(ddgs.text(query, max_results=15))
+            search_results = list(ddgs.text(query, max_results=limit))
             
             for i, r in enumerate(search_results):
-                name = r.get("title", "").split("-")[0].strip()
-                log_area.markdown(f"**Processing:** {name}...")
+                # Clean up the name for processing
+                title = r.get("title", "")
+                body = r.get("body", "")
+                url = r.get("href", "")
+                name = title.split("-")[0].strip()
+                
+                log_area.markdown(f"⚙️ **Processing:** {name}...")
                 
                 # 1. First Pass
-                fp_score, fp_breakdown, _, fp_enriched = score_text(r['body'], query, r['href'])
+                fp_score, fp_breakdown, _, fp_enriched = score_text(body, query, url)
                 
-                # 2. Second Pass (if FP is decent)
+                # 2. Second Pass Verification
                 sp_score = 0.0
+                sp_signals = []
+                
+                # If First Pass shows potential, run the verification pass
                 if fp_score >= 4.0:
-                    log_area.warning(f"High Potential Found: {name}. Running Verification...")
-                    # Simulating deep lookup/second pass
-                    sp_score, _ = second_pass.score_text(r['body'], r['href'], {})
+                    log_area.warning(f"💎 High Potential Found: {name}. Running Verification...")
+                    
+                    # Initialize state for second pass requirement
+                    state = {
+                        "linkedin_hits": 0, 
+                        "domain_hits": set(), 
+                        "identity_confirmed": False, 
+                        "geo_hits": 0, 
+                        "expected_name": name.lower()
+                    }
+                    
+                    # Corrected function call to score_second_pass
+                    sp_score, sp_signals, _ = second_pass.score_second_pass(body, url, state)
                 
                 # Keyword Extraction for the "Clean Table"
-                combined_text = (r['title'] + " " + r['body']).lower()
+                combined_text = (title + " " + body).lower()
                 
-                # Create result entry
+                # Create result entry including Second Pass results for consolidation
                 entry = {
                     "Name": name,
                     "Identity": extract_found_keywords(combined_text, identity_keywords),
@@ -85,13 +105,13 @@ def run_dashboard():
                     "Verdict": "GREAT" if (fp_score + sp_score) > 8 else ("GOOD" if (fp_score + sp_score) > 5 else "NOISE")
                 }
                 
-                # Append to the session state list
+                # Append to the session state list to persist across reruns
                 st.session_state['all_leads'].append(entry)
                 
                 progress_bar.progress((i + 1) / len(search_results))
                 time.sleep(0.1) # Smoothness for the demo
 
-        log_area.success("Discovery Complete!")
+        log_area.success("✅ Discovery Complete!")
 
     # Display results if any exist in session state
     if st.session_state['all_leads']:
@@ -102,22 +122,22 @@ def run_dashboard():
         m1, m2, m3 = st.columns(3)
         m1.metric("Leads Analyzed", len(df))
         
-        # Qualified leads logic: Both 'GREAT' and 'GOOD' added together
+        # Qualified leads: Sum of 'GREAT' and 'GOOD' scores
         qualified_count = len(df[df['Verdict'].isin(['GREAT', 'GOOD'])])
         m2.metric("High Quality (Green)", qualified_count)
         
         m3.metric("Review Needed", len(df[df['Verdict'] == 'GOOD']))
 
         # --- Filters ---
-        show_green = st.toggle("Filter: Show Green List Only", value=False)
+        show_green = st.toggle("Filter: Show Green List Only (Finalists)", value=False)
         if show_green:
-            # Filtering for the "Green List" includes both GREAT and GOOD as per instructions
+            # Displays both GREAT and GOOD leads in the finalists list
             df = df[df['Verdict'].isin(['GREAT', 'GOOD'])]
 
         # --- Final Presentation Table ---
         st.subheader("Extracted Lead Intelligence")
         
-        # Removed the "Confidence" ProgressColumn as it was confusing/incorrectly scaled
+        # Confidence visual removed to avoid scaling confusion
         st.dataframe(
             df[["Name", "Final Score", "Identity", "Seniority", "Geography", "Verdict"]].sort_values("Final Score", ascending=False),
             use_container_width=True,
