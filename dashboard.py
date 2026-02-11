@@ -2,113 +2,126 @@ import streamlit as st
 import pandas as pd
 import time
 from ddgs import DDGS
-import first_pass
+from first_pass import score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords, seniority_keywords
 import second_pass
 
-def inject_SaaS_theme():
+# --- UI STYLING ---
+def inject_custom_css():
     st.markdown("""
         <style>
-        /* Modern Header */
-        .main { background-color: #F9FAFB; }
-        .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        
-        /* Badge UI */
-        .keyword-badge { background-color: #1e293b; color: #ffffff !important; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin: 2px; display: inline-block; border: 1px solid #334155; }
+        /* Modern Font and Background */
+        .main { background-color: #f8f9fa; }
+        div.stButton > button {
+            background-color: #007bff; color: white; border-radius: 8px;
+            height: 3em; width: 100%; font-weight: bold; border: none;
+        }
+        /* Card Styling for Results */
+        .metric-card {
+            background: white; padding: 20px; border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center;
+        }
+        /* Badge Styling */
+        .badge {
+            padding: 4px 10px; border-radius: 20px; font-size: 11px;
+            font-weight: bold; margin-right: 5px; display: inline-block;
+        }
+        .badge-id { background: #e3f2fd; color: #1976d2; }
+        .badge-geo { background: #e8f5e9; color: #2e7d32; }
+        .badge-sen { background: #fff3e0; color: #ef6c00; }
         </style>
-                
-        /* Traffic Light System for Verdicts */
-        .verdict-great { background-color: #059669; color: white !important; padding: 4px 12px; border-radius: 6px; font-weight: bold; }
-        .verdict-good { background-color: #0284c7; color: white !important; padding: 4px 12px; border-radius: 6px; font-weight: bold; }        
     """, unsafe_allow_html=True)
 
-def get_found_tags(text, keywords):
-    """Checks text against keyword list and returns unique found items."""
-    found = [k.upper() for k in keywords if k.lower() in text.lower()]
-    return list(set(found))
+def extract_found_keywords(text, keyword_list):
+    """Helper to find which specific keywords triggered the match."""
+    found = [k for k in keyword_list if k.lower() in str(text).lower()]
+    return ", ".join(list(set(found))).upper()
 
 def run_dashboard():
-    inject_SaaS_theme()
-    st.title("💎 Investor Discovery Hub")
-    st.caption("AI-Powered Lead Intelligence & Verification")
+    inject_custom_css()
+    st.title("Leads dashboard")
 
-    # Configuration
-    with st.expander("🔍 Search Settings", expanded=True):
-        col1, col2 = st.columns([3, 1])
-        query = col1.text_input("Global Search Query", value='"angel investor" Dubai site:linkedin.com/in')
-        limit = col2.number_input("Lead Limit", 5, 50, 10)
-    
-    if st.button("🚀 Start Deep Discovery"):
-        results_data = []
+    # Initialize session state to store leads so they append and persist
+    if 'all_leads' not in st.session_state:
+        st.session_state['all_leads'] = []
+
+    # Layout for Input
+    c1, c2 = st.columns([3, 1])
+    query = c1.text_input("Enter Search Keywords (e.g., 'Angel Investors Dubai')", placeholder="Dubai Venture Capitalists...")
+    run_btn = c2.button("Run Deep Discovery")
+
+    if run_btn and query:
+        progress_bar = st.progress(0)
+        log_area = st.empty()
         
-        # This container makes it look like a high-end SaaS tool
-        with st.status("🕵️ System Initialized: Scanning Global Sources...", expanded=True) as status:
-            with DDGS() as ddgs:
-                raw_hits = list(ddgs.text(query, max_results=limit))
-                
-                for i, hit in enumerate(raw_hits):
-                    title = hit.get('title', 'Unknown')
-                    url = hit.get('href', '')
-                    body = hit.get('body', '')
-                    name = title.split('|')[0].split('-')[0].strip()
-                    
-                    status.update(label=f"Analyzing Lead {i+1}/{len(raw_hits)}: {name}")
-                    
-                    # 1. First Pass
-                    fp_score, _, fp_signals, _ = first_pass.score_text(f"{title} {body}", query, url)
-                    
-                    # 2. Second Pass
-                    sp_score = 0.0
-                    sp_signals = []
-                    if fp_score > 4.0:
-                        st.write(f"✨ **High Confidence match for {name}**. Running verification...")
-                        # FIXED: Correct function call from second_pass.py
-                        state = {"linkedin_hits": 0, "domain_hits": set(), "identity_confirmed": False, "geo_hits": 0, "expected_name": name.lower()}
-                        sp_score, sp_signals, _ = second_pass.score_second_pass(f"{title} {body}", url, state)
-                    
-                    # 3. Consolidate Data
-                    total_score = (fp_score + sp_score) / 2
-                    combined_text = f"{title} {body}".lower()
-                    
-                    results_data.append({
-                        "Name": name,
-                        "Final Score": round(total_score, 1),
-                        "Seniority": get_found_tags(combined_text, first_pass.seniority_keywords),
-                        "Identity": get_found_tags(combined_text, first_pass.identity_keywords),
-                        "Geography": get_found_tags(combined_text, first_pass.uae_keywords + first_pass.mena_keywords),
-                        "Verdict": "GREAT" if total_score >= 7.5 else ("GOOD" if total_score >= 5.0 else "NOISE"),
-                        "URL": url
-                    })
+        with DDGS() as ddgs:
+            log_area.info(f"🔍 Executing global search for: {query}...")
+            # Limit to 15 for a fast demo
+            search_results = list(ddgs.text(query, max_results=15))
             
-            status.update(label="✅ Discovery Process Complete", state="complete", expanded=False)
+            for i, r in enumerate(search_results):
+                name = r.get("title", "").split("-")[0].strip()
+                log_area.markdown(f"**Processing:** {name}...")
+                
+                # 1. First Pass
+                fp_score, fp_breakdown, _, fp_enriched = score_text(r['body'], query, r['href'])
+                
+                # 2. Second Pass (if FP is decent)
+                sp_score = 0.0
+                if fp_score >= 4.0:
+                    log_area.warning(f"High Potential Found: {name}. Running Verification...")
+                    # Simulating deep lookup/second pass
+                    sp_score, _ = second_pass.score_text(r['body'], r['href'], {})
+                
+                # Keyword Extraction for the "Clean Table"
+                combined_text = (r['title'] + " " + r['body']).lower()
+                
+                # Create result entry
+                entry = {
+                    "Name": name,
+                    "Identity": extract_found_keywords(combined_text, identity_keywords),
+                    "Seniority": extract_found_keywords(combined_text, seniority_keywords),
+                    "Geography": extract_found_keywords(combined_text, uae_keywords + mena_keywords),
+                    "Final Score": round((fp_score + sp_score), 1),
+                    "Verdict": "GREAT" if (fp_score + sp_score) > 8 else ("GOOD" if (fp_score + sp_score) > 5 else "NOISE")
+                }
+                
+                # Append to the session state list
+                st.session_state['all_leads'].append(entry)
+                
+                progress_bar.progress((i + 1) / len(search_results))
+                time.sleep(0.1) # Smoothness for the demo
+
+        log_area.success("Discovery Complete!")
+
+    # Display results if any exist in session state
+    if st.session_state['all_leads']:
+        df = pd.DataFrame(st.session_state['all_leads'])
 
         # --- Dashboard Metrics ---
-        df = pd.DataFrame(results_data)
         st.divider()
-        
         m1, m2, m3 = st.columns(3)
-        green_count = len(df[df['Verdict'] == "GREAT"])
-        m1.metric("Qualified Leads", green_count, delta=f"{green_count} High Confidence")
-        m2.metric("Identity Matches", df['Identity'].apply(lambda x: len(x) > 0).sum())
-        m3.metric("Geo Verified", df['Geography'].apply(lambda x: len(x) > 0).sum())
-
-        # --- Filters & Display ---
-        show_only_green = st.toggle("Show Only Green List (Finalists)")
+        m1.metric("Leads Analyzed", len(df))
         
-        display_df = df.copy()
-        if show_only_green:
-            display_df = display_df[display_df['Verdict'] == "GREAT"]
+        # Qualified leads logic: Both 'GREAT' and 'GOOD' added together
+        qualified_count = len(df[df['Verdict'].isin(['GREAT', 'GOOD'])])
+        m2.metric("High Quality (Green)", qualified_count)
+        
+        m3.metric("Review Needed", len(df[df['Verdict'] == 'GOOD']))
 
-        # Formatting Lists for Display
-        display_df['Identity'] = display_df['Identity'].apply(lambda x: " | ".join(x) if x else "—")
-        display_df['Seniority'] = display_df['Seniority'].apply(lambda x: " | ".join(x) if x else "—")
-        display_df['Geography'] = display_df['Geography'].apply(lambda x: " | ".join(x) if x else "—")
+        # --- Filters ---
+        show_green = st.toggle("Filter: Show Green List Only", value=False)
+        if show_green:
+            # Filtering for the "Green List" includes both GREAT and GOOD as per instructions
+            df = df[df['Verdict'].isin(['GREAT', 'GOOD'])]
 
-        st.subheader("Final Consolidation Table")
+        # --- Final Presentation Table ---
+        st.subheader("Extracted Lead Intelligence")
+        
+        # Removed the "Confidence" ProgressColumn as it was confusing/incorrectly scaled
         st.dataframe(
-            display_df[["Name", "Final Score", "Identity", "Seniority", "Geography", "Verdict", "URL"]].sort_values("Final Score", ascending=False),
+            df[["Name", "Final Score", "Identity", "Seniority", "Geography", "Verdict"]].sort_values("Final Score", ascending=False),
             use_container_width=True,
             column_config={
-                "URL": st.column_config.LinkColumn("Source"),
-                "Final Score": st.column_config.ProgressColumn("Confidence", min_value=0, max_value=12)
+                "Verdict": st.column_config.TextColumn("Status")
             }
         )
