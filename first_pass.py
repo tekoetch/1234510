@@ -21,7 +21,7 @@ behavior_keywords = [
     "seed", "pre-seed", "early-stage", "funding", "summit"
     "venture capital", "private equity", "real estate",
     "fundraising", "investment portfolio", "wealth funds",
-    "property management", "dedicated portfolio"
+    "property management", "dedicated portfolio", "active"
 ]
 
 seniority_keywords = [
