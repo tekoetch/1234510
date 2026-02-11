@@ -378,8 +378,16 @@ else:
                 ml_id, ml_beh, ml_geo, ml_avg = 0.0, 0.0, 0.0, 0.0
                 if ml_brain:
                     # Prepare binary features like in training
-                    fp_signals_list = list(set().union(*g["FP_Signals"].astype(str).str.split(",").tolist()))
-                    sp_signals_list = list(set().union(*g["SP_Signals"].astype(str).str.split(",").tolist()))
+                    fp_signals_raw = str(first_pass_row.get("FP_Signals", ""))
+                    fp_signals_list = [s.strip() for s in fp_signals_raw.split(",") if s.strip()]
+
+                    if "SP_Signals" in g.columns:
+                        sp_signals_list = list(
+                            set().union(*g["SP_Signals"].astype(str).str.split(",").tolist())
+                        )
+                    else:
+                        sp_signals_list = []
+
                     feats = {}
                     for sig in fp_signals_list:
                         feats[f"FP_HAS_{sig.strip().upper().replace(' ', '_')}"] = 1
