@@ -13,8 +13,12 @@ def inject_SaaS_theme():
         .stMetric { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         
         /* Badge UI */
-.keyword-badge { background-color: #E0E7FF; color: #1e1b4b; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin: 2px; display: inline-block; border: 1px solid #C7D2FE; }
+        .keyword-badge { background-color: #1e293b; color: #ffffff !important; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; margin: 2px; display: inline-block; border: 1px solid #334155; }
         </style>
+                
+        /* Traffic Light System for Verdicts */
+        .verdict-great { background-color: #059669; color: white !important; padding: 4px 12px; border-radius: 6px; font-weight: bold; }
+        .verdict-good { background-color: #0284c7; color: white !important; padding: 4px 12px; border-radius: 6px; font-weight: bold; }        
     """, unsafe_allow_html=True)
 
 def get_found_tags(text, keywords):
