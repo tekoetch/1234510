@@ -59,6 +59,8 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
     # Substring check in signal list (Fixed)
     elif any("Geography" in str(s) for s in fp_signals) or any("Geography" in str(s) for s in sp_signals):
         est_geo = 8
+    elif any("UAE LinkedIn domain (+0.6)" in str(s) for s in fp_signals):
+        est_geo = 7    
     
     # Penalty for mismatch
     if any(k in combined_text for k in ["new york", "london", "india", "united states"]):
