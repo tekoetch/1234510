@@ -76,6 +76,8 @@ def run_ml_trainer():
             # ---- Final row ----
             entry = {
                 "Name": name,
+                "Title": title,
+                "Snippet": snippet,
                 "URL": url,
                 "FP_Score": round(fp_score, 2),
                 "SP_Score": round(sp_score, 2),
