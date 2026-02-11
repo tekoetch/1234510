@@ -8,6 +8,7 @@ import numpy as np
 
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
+from dashboard import run_dashboard
 from ml import (run_ml_trainer, clean_key, build_feature_vector)
 
 ml_brain = None
@@ -26,15 +27,17 @@ if "first_pass_results" not in st.session_state:
 if "second_pass_results" not in st.session_state:
     st.session_state.second_pass_results = []
 
-st.sidebar.title("Control Panel")
-choice = st.sidebar.radio("Switch View:", ["Lead Dashboard", "ML Trainer"])
+st.sidebar.title("Sidebar")
+choice = st.sidebar.radio("Switch View:", ["Dashboard", "Testing dashboard", "AI model generation"])
 
-if choice == "ML Trainer":
+if choice == "Dashboard":
+    run_dashboard()
+elif choice == "AI model generation":
     run_ml_trainer()
 else:
 
     st.set_page_config(page_title="Leads Dashboard", layout="wide")
-    st.title("Investor Lead Discovery System")
+    st.title("Leads Dashboard")
 
     blocked_urls = [
         "bing.com/aclick",
