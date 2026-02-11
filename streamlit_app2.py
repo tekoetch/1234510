@@ -413,16 +413,25 @@ else:
 
                 if ml_brain and feature_columns:
 
-                    # Extract clean signal lists
-                    fp_signals_list = []
-                    sp_signals_list = []
+                    import re  # ← add this at the top of the file if not already there
 
-                    # Get FP signals from first_pass_row (not from g)
+                    # Robust split that handles both ", " and " | "
+                    def robust_split(text):
+                        if not text:
+                            return []
+                        # Split on comma or |, then strip
+                        parts = re.split(r'\s*[,|]\s*', str(text))
+                        return [p.strip() for p in parts if p.strip()]
+
+                    # First-pass signals (from df_first)
                     fp_signals = str(first_pass_row.get("Signals", ""))
-                    fp_signals_list = list(set(clean_signal(s) for s in fp_signals.split(" | ") if s.strip()))
+                    fp_signals_list = [clean_signal(s) for s in robust_split(fp_signals)]
 
-                    # Get SP signals from g["Score Breakdown"]
-                    sp_signals_list = list(set(clean_signal(s) for row in g["Score Breakdown"].dropna() for s in str(row).split(" | ") if s.strip()))
+                    # Second-pass signals (from Score Breakdown)
+                    sp_signals_raw = []
+                    for breakdown in g["Score Breakdown"].dropna():
+                        sp_signals_raw.extend(robust_split(breakdown))
+                    sp_signals_list = list(set(sp_signals_raw))   # unique
 
                     df_input = build_feature_vector(
                         fp_signals_list,
@@ -431,7 +440,6 @@ else:
                     )
 
                     preds = ml_brain.predict(df_input)[0]
-
                     ml_id, ml_beh, ml_geo = np.clip(preds, 1, 10)
                     ml_avg = round((ml_id + ml_beh + ml_geo) / 3, 1)
             
