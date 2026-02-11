@@ -3,10 +3,18 @@ from ddgs import DDGS
 import pandas as pd
 import re
 import time
+import joblib
+import numpy as np
+
+ml_brain = None
+try:
+    ml_brain = joblib.load("model.pkl")
+except:
+    st.warning("ML model not found. ML predictions will be skipped.")
 
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
-from ml import run_ml_trainer
+from ml import run_ml_trainer, extract_binary_features
 
 if "first_pass_results" not in st.session_state:
     st.session_state.first_pass_results = []
@@ -366,11 +374,44 @@ else:
                     investor = "No"
                     uae = "No"   
 
+                # --- ML Prediction Logic ---
+                ml_id, ml_beh, ml_geo, ml_avg = 0.0, 0.0, 0.0, 0.0
+                if ml_brain:
+                    # Prepare binary features like in training
+                    fp_signals_list = list(set().union(*g["FP_Signals"].astype(str).str.split(",").tolist()))
+                    sp_signals_list = list(set().union(*g["SP_Signals"].astype(str).str.split(",").tolist()))
+                    feats = {}
+                    for sig in fp_signals_list:
+                        feats[f"FP_HAS_{sig.strip().upper().replace(' ', '_')}"] = 1
+                    for sig in sp_signals_list:
+                        feats[f"SP_HAS_{sig.strip().upper().replace(' ', '_')}"] = 1
+                    feats["FP_Score"] = first_pass_score
+                    feats["SP_Score"] = second_pass_total
+
+                    df_input = pd.DataFrame([feats]).fillna(0)
+
+                    # Ensure columns match training model
+                    if hasattr(ml_brain, "estimators_"):  # MultiOutputRegressor
+                        base_model = ml_brain.estimators_[0]
+                        if hasattr(base_model, "feature_names_in_"):
+                            for col in base_model.feature_names_in_:
+                                if col not in df_input.columns:
+                                    df_input[col] = 0
+                            df_input = df_input[base_model.feature_names_in_]
+
+                    preds = ml_brain.predict(df_input)[0]
+                    ml_id, ml_beh, ml_geo = np.clip(preds, 1, 10)
+                    ml_avg = round((ml_id + ml_beh + ml_geo) / 3, 1)    
+
                 consolidated.append({
                     "Name": name,
                     "First Pass Score": round(first_pass_score, 1),
                     "Second Pass Score": round(second_pass_total, 1),
                     "Final Score": round(final_score, 1),
+                    "ML_Identity": round(ml_id, 1),
+                    "ML_Behavior": round(ml_beh, 1),
+                    "ML_Geo": round(ml_geo, 1),
+                    "ML_Final_Score": ml_avg,
                     "Investor Confirmed": investor_confirmed,
                     "UAE Confirmed": uae_confirmed,
                     "Enriched Company": final_company,
