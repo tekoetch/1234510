@@ -86,6 +86,34 @@ else:
                 return title.split(sep)[0].strip()
         return title.strip()
     
+    PERSONAL_EMAIL_PATTERN = re.compile(
+        r'\b[A-Za-z0-9._%+-]+@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com)\b',
+        re.IGNORECASE
+    )
+
+    def extract_personal_emails(snippets):
+        found = set()
+        for text in snippets:
+            matches = PERSONAL_EMAIL_PATTERN.findall(text)
+            for match in PERSONAL_EMAIL_PATTERN.finditer(text):
+                found.add(match.group(0).lower())
+        return list(found)
+
+    def extract_social_links(urls):
+        socials = set()
+        
+        for url in urls:
+            u = url.lower()
+            if "instagram.com/" in u:
+                socials.add("Instagram")
+            elif "twitter.com/" in u or "x.com/" in u:
+                socials.add("Twitter/X")
+            elif "facebook.com/" in u:
+                socials.add("Facebook")
+        
+        return list(socials)
+
+    
     def clean_key(text):
         return text.strip().upper().replace(" ", "_")
     
@@ -359,6 +387,9 @@ else:
                 
                 # Enrichment Check
                 sources = []
+                urls = g["Source URL"].dropna().tolist()
+                snippets = g["Snippet"].dropna().tolist()
+
                 if any("rocketreach.co" in url.lower() for url in g["Source URL"]):
                     sources.append("RocketReach")
                 if any("zoominfo.com" in url.lower() for url in g["Source URL"]):
@@ -367,6 +398,14 @@ else:
                     sources.append("Yello.ae")    
                 if any("linkedin.com/company/" in url.lower() for url in g["Source URL"]):
                     sources.append("Company information inside LinkedIn")
+
+                personal_emails = extract_personal_emails(snippets)
+                if personal_emails:
+                    sources.append("Email Detected")   
+
+                social_profiles = extract_social_links(urls)
+                for s in social_profiles:
+                    sources.append(s)     
 
                 enriched_social = ""
                 if sources:
