@@ -80,7 +80,7 @@ else:
         placeholder='"angel investor" UAE site:linkedin.com/in'
     )
 
-    max_results_per_query = st.number_input("Results per query", 1, 50, 15)
+    max_results_per_query = st.number_input("Results per query", 1, 50, 10)
 
     if st.button("Run Discovery"):
         queries = [q.strip() for q in query_input.split("\n") if q.strip()]
@@ -406,7 +406,7 @@ else:
             )
             
             # Metrics
-            c1, c2 = st.columns(3)
+            c1, c2 = st.columns(2)
             total_count = len(df_consolidated[df_consolidated["Final Verdict"] == "GREAT"]) + len(df_consolidated[df_consolidated["Final Verdict"] == "GOOD"])
             c1.metric("Green List", total_count, color="green")
             c2.metric("Review Pending/Discarded", len(df_consolidated[df_consolidated["Final Verdict"] == "PENDING"]))
