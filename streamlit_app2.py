@@ -105,11 +105,11 @@ else:
         for url in urls:
             u = url.lower()
             if "instagram.com/" in u:
-                socials.add("Instagram")
+                socials.add("Instagram Presence")
             elif "twitter.com/" in u or "x.com/" in u:
-                socials.add("Twitter/X")
+                socials.add("Twitter/X Presence")
             elif "facebook.com/" in u:
-                socials.add("Facebook")
+                socials.add("Facebook Presence")
         
         return list(socials)
 
