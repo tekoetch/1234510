@@ -29,7 +29,7 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
     elif any(k in t_val for k in ["ceo", "private equity", "partner", "incubator", "angel", "founder", "co-founder"]):
         est_id = 8
     # Substring check in signal list (Fixed)
-    elif any("Identity" in str(s) for s in fp_signals):
+    elif any("Identity" in clean_signal(str(s)) for s in fp_signals):
         est_id = 7
     
     # BEHAVIOR ESTIMATE
@@ -37,7 +37,7 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
     if any(k in combined_text for k in ["portfolio", "invested in", "funding", "exits", "series a", "seed"]):
         est_beh = 8
     # Substring check in signal list (Fixed)
-    elif any("Behavior" in str(s) for s in fp_signals) or any("Behavior" in str(s) for s in sp_signals):
+    elif any("Behavior" in clean_signal(str(s)) for s in fp_signals) or any("Behavior" in clean_signal(str(s)) for s in sp_signals):
         est_beh = 7
     elif sp_score > 3.0: 
         est_beh = 5
@@ -49,9 +49,9 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
     elif any(k in combined_text for k in ["middle east", "emirates", "mena", "gcc"]):
         est_geo = 9
     # Substring check in signal list (Fixed)
-    elif any("Geography" in str(s) for s in fp_signals) or any("Geography" in str(s) for s in sp_signals):
+    elif any("Geography" in clean_signal(str(s)) for s in fp_signals) or any("Geography" in clean_signal(str(s)) for s in sp_signals):
         est_geo = 8
-    elif any("UAE LinkedIn domain (+0.6)" in str(s) for s in fp_signals):
+    elif any("UAE LinkedIn domain (+0.6)" in clean_signal(str(s)) for s in fp_signals):
         est_geo = 7    
     
     # Penalty for mismatch
@@ -64,6 +64,11 @@ def estimate_manual_labels(row, fp_score, sp_score, fp_signals, sp_signals):
 def clean_key(text):
     return text.strip().upper().replace(" ", "_")
 
+def clean_signal(text):
+    if "(+" in text:
+        return text.split("(+")[0].strip()
+    return text.strip()
+
 def build_feature_vector(fp_signals, sp_signals, expected_columns=None):
     """
     Builds consistent binary feature vector.
@@ -72,11 +77,13 @@ def build_feature_vector(fp_signals, sp_signals, expected_columns=None):
     features = {}
 
     for sig in fp_signals:
-        key = f"FP_HAS_{clean_key(sig)}"
+        cleaned = clean_signal(sig)
+        key = f"FP_HAS_{clean_key(cleaned)}"
         features[key] = 1
 
     for sig in sp_signals:
-        key = f"SP_HAS_{clean_key(sig)}"
+        cleaned = clean_signal(sig)
+        key = f"SP_HAS_{clean_key(cleaned)}"
         features[key] = 1
 
     df = pd.DataFrame([features]).fillna(0)
