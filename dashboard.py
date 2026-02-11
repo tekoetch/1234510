@@ -138,7 +138,7 @@ def run_dashboard():
             df = df[df['Verdict'].isin(['GREAT', 'GOOD'])]
 
         # --- Final Presentation Table ---
-        st.subheader("Extracted Lead Intelligence")
+        st.subheader("Extracted Lead Information")
         
         st.dataframe(
             df[["Name", "Identity", "Seniority", "Geography", "Verdict"]].sort_values("Verdict"),
@@ -156,3 +156,4 @@ def run_dashboard():
             file_name="TekhLeads Leads List.csv",
             mime="text/csv"
         )
+
