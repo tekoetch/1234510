@@ -7,6 +7,7 @@ from sklearn.multioutput import MultiOutputRegressor
 
 import first_pass
 import second_pass
+from first_pass import extract_name
 
 def extract_binary_features(fp_signals, sp_signals):
     features = {}
@@ -29,7 +30,7 @@ def run_ml_trainer():
     st.header("Step 1: Generate labeling sheet")
 
     raw_file = st.file_uploader(
-        "Upload CSV with Name, Title, Snippet, URL",
+        "Upload CSV with Title, Snippet, URL",
         type=["csv"]
     )
 
@@ -38,10 +39,12 @@ def run_ml_trainer():
         rows = []
 
         for _, row in raw_df.iterrows():
-            name = str(row.get("Name", ""))
             title = str(row.get("Title", ""))
             snippet = str(row.get("Snippet", ""))
             url = str(row.get("URL", ""))
+            name = extract_name(title)
+            if not name or len(name.split()) < 2:
+                continue
 
             # ---- First Pass ----
             combined_text = f"{title} {snippet}"
