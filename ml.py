@@ -160,19 +160,35 @@ def run_ml_trainer():
 
     if labeled_file and st.button("Train Model"):
         data = pd.read_csv(labeled_file)
+
         label_cols = ["LABEL_Identity", "LABEL_Behavior", "LABEL_Geo"]
+
         X = data.drop(columns=label_cols).select_dtypes(include=["number"])
         y = data[label_cols]
 
-        model = MultiOutputRegressor(XGBRegressor(n_estimators=150, max_depth=5, learning_rate=0.07, random_state=42))
+        model = MultiOutputRegressor(
+            XGBRegressor(
+                n_estimators=150,
+                max_depth=5,
+                learning_rate=0.07,
+                random_state=42
+            )
+        )
+
         model.fit(X, y)
+
         model_package = {
-        "model": model,
-        "feature_columns": X.columns.tolist()
-    }
+            "model": model,
+            "feature_columns": X.columns.tolist()
+        }
 
-    joblib.dump(model_package, "investor_brain.pkl")
+        joblib.dump(model_package, "model.pkl")
 
-    st.success("Model trained successfully")
-    with open("investor_brain.pkl", "rb") as f:
-        st.download_button("Download investor_brain.pkl", f, file_name="investor_brain.pkl")
+        st.success("Model trained successfully")
+
+        with open("model.pkl", "rb") as f:
+            st.download_button(
+                "Download model.pkl",
+                f,
+                file_name="model.pkl"
+            )
