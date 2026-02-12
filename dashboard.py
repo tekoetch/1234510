@@ -26,7 +26,12 @@ def run_dashboard():
         padding-bottom: 2rem;
         max-width: 1200px;
     }
-    
+                
+    h1 {
+        text-align: center;
+        width: 100%;
+    }
+                
     /* Metric cards styling */
     [data-testid="stMetricValue"] {
         font-size: 2rem;
@@ -83,7 +88,14 @@ def run_dashboard():
         font-weight: 600;
         margin-right: 8px;
         margin-bottom: 8px;
+        backdrop-filter: blur(4px);
     }
+                
+    .badge:hover {
+        transform: scale(1.05);
+        transition: transform 0.2s ease;
+        cursor: default;
+    }            
     
     .badge-identity {
         background-color: #DBEAFE;
@@ -200,7 +212,7 @@ def run_dashboard():
     """, unsafe_allow_html=True)
     
     # ==================== HEADER ====================
-    st.title("🔍 UAE Investor Discovery Platform")
+    st.title("UAE Investor Discovery Platform")
     st.markdown("### AI-Powered Lead Intelligence for High-Value Investors")
     st.markdown("---")
     
@@ -313,7 +325,7 @@ def run_dashboard():
     # ==================== DISCOVER BUTTON ====================
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
-        discover_button = st.button("🚀 Discover UAE Investors", use_container_width=True, type="primary")
+        discover_button = st.button("Discover UAE Investors", use_container_width=True, type="primary")
     
     # Check if discovery should run (either main button or "Discover More")
     should_discover = discover_button or st.session_state.trigger_discovery
@@ -382,7 +394,7 @@ def run_dashboard():
                         existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
                         if conf == "High":
                             existing["Confidence"] = "High"
-                        elif conf == "Medium" and existing["Confidence"] == "Low":
+                        elif conf == "Medium" and existing.get("Confidence") == "Low":
                             existing["Confidence"] = "Medium"
                     else:
                         temp_first_pass.append({
@@ -496,18 +508,19 @@ def run_dashboard():
             verdict = "Green List" if final_score >= 5.0 else "Red List"
             
             consolidated.append({
-                "Name": name,
-                "Company": enriched_company,
-                "Identity Keywords": identity_kws,
-                "Geo Keywords": geo_kws,
-                "Seniority Keywords": seniority_kws,
-                "Score": final_score,
-                "Final Verdict": verdict,
-                "URL": url,
-                "Title": title,     # Preserves for duplicate checking
-                "Snippet": snippet, # Preserves for duplicate checking
-                "Signals": signals  # Preserves for keyword extraction
-            })
+                            "Name": name,
+                            "Company": enriched_company,
+                            "Identity Keywords": identity_kws,
+                            "Geo Keywords": geo_kws,
+                            "Seniority Keywords": seniority_kws,
+                            "Score": final_score,
+                            "Final Verdict": verdict,
+                            "URL": url,
+                            "Title": person.get("Title", ""),
+                            "Snippet": person.get("Snippet", ""),
+                            "Signals": signals,
+                            "Confidence": person.get("Confidence", "Low")
+                        })
         
         # Update results in session state
         st.session_state.dashboard_results = []
