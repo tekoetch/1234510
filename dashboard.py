@@ -479,6 +479,7 @@ def run_dashboard():
             # Extract keywords
             identity_kws = extract_keywords_from_signals(signals, identity_keywords)
             geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
+            seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)
             
             # Check if verified
             if not df_second.empty and name in df_second["Name"].values:
