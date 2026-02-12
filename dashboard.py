@@ -213,7 +213,7 @@ def run_dashboard():
     """, unsafe_allow_html=True)
     
     # ==================== HEADER ====================
-    st.markdown("<h1 style='text-align: center;'>🔍 UAE Investor Discovery Platform</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'> TekhLeads UAE Investor Discovery Platform</h1>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center; color: #6B7280;'>AI-Powered Lead Intelligence for High-Value Investors</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
