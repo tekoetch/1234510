@@ -4,7 +4,7 @@ import pandas as pd
 import re
 import time
 
-from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
+from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords, seniority_keywords)
 import second_pass
 
 
@@ -95,6 +95,12 @@ def run_dashboard():
         background-color: #D1FAE5;
         color: #065F46;
         border: 1px solid #6EE7B7;
+    }
+    
+    .badge-seniority {
+        background-color: #FEF3C7;
+        color: #92400E;
+        border: 1px solid #FCD34D;
     }
     
     .badge-green {
@@ -203,6 +209,8 @@ def run_dashboard():
         st.session_state.dashboard_results = []
     if "dashboard_verified" not in st.session_state:
         st.session_state.dashboard_verified = []
+    if "trigger_discovery" not in st.session_state:
+        st.session_state.trigger_discovery = False
     
     # ==================== HELPER FUNCTIONS ====================
     blocked_urls = [
@@ -256,6 +264,11 @@ def run_dashboard():
         for kw in keyword_list:
             if kw in signals_lower:
                 found.append(kw)
+        
+        # Remove "angel" if "angel investor" is present
+        if "angel investor" in found and "angel" in found:
+            found.remove("angel")
+        
         return list(set(found))
     
     # ==================== METRICS SECTION ====================
@@ -302,13 +315,20 @@ def run_dashboard():
     with col_btn2:
         discover_button = st.button("🚀 Discover UAE Investors", use_container_width=True, type="primary")
     
+    # Check if discovery should run (either main button or "Discover More")
+    should_discover = discover_button or st.session_state.trigger_discovery
+    
+    # Reset the trigger
+    if st.session_state.trigger_discovery:
+        st.session_state.trigger_discovery = False
+    
     st.markdown("<br>", unsafe_allow_html=True)
     
     # ==================== DISCOVERY PROCESS ====================
-    if discover_button:
+    if should_discover:
         # Fixed query for UAE angel investors
         query = '"angel investor" UAE site:linkedin.com/in'
-        max_results = 10
+        max_results = 5
         
         # First Pass Container
         first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
@@ -477,6 +497,7 @@ def run_dashboard():
                 "Company": enriched_company,
                 "Identity Keywords": identity_kws,
                 "Geo Keywords": geo_kws,
+                "Seniority Keywords": seniority_kws,
                 "Score": final_score,
                 "Final Verdict": verdict,
                 "URL": url
@@ -490,190 +511,6 @@ def run_dashboard():
         st.success("Discovery Complete!")
         time.sleep(3)
         st.rerun()
-    
-    # ==================== DISCOVER MORE BUTTON ====================
-    if st.session_state.dashboard_results:
-        st.markdown("---")
-        col_more1, col_more2, col_more3 = st.columns([1, 2, 1])
-        with col_more2:
-            discover_more_button = st.button("Discover More", use_container_width=True)
-        
-        if discover_more_button:
-            # Run the same discovery process
-            query = '"angel investor" UAE site:linkedin.com/in'
-            max_results = 5
-            
-            # First Pass Container
-            first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
-            with first_pass_status:
-                st.write("Searching LinkedIn profiles...")
-                progress_bar = st.progress(0)
-                
-                temp_first_pass = []
-                
-                with DDGS(timeout=10) as ddgs:
-                    results_list = list(ddgs.text(query, max_results=max_results, backend="lite"))
-                    total = len(results_list)
-                    
-                    for idx, r in enumerate(results_list):
-                        url = r.get("href", "")
-                        if not url:
-                            continue
-                        
-                        if any(bad in normalize_url(url) for bad in blocked_urls):
-                            continue
-                        
-                        title = soft_truncate_ellipsis(r.get("title", ""))
-                        snippet = soft_truncate_ellipsis(r.get("body", ""))
-                        
-                        if " | LinkedIn" in title:
-                            match = re.search(r'(\s*[-–—]?\s*\|\s*LinkedIn)', title)
-                            if match:
-                                cut_idx = match.start()
-                                title = title[:cut_idx + len(match.group(0))].strip()
-                            else:
-                                parts = title.split(" | LinkedIn")
-                                title = parts[0].strip() + " | LinkedIn"
-                        
-                        if is_duplicate_url(url, st.session_state.dashboard_results, title, snippet):
-                            continue
-                        
-                        combined = f"{title} {snippet}"
-                        score, conf, breakdown, enriched_company = score_text(combined, query, url)
-                        name = extract_name(title)
-                        
-                        if not is_valid_person_name(name):
-                            continue
-                        
-                        existing_idx = find_existing_person(url, st.session_state.dashboard_results)
-                        if existing_idx is not None:
-                            existing = st.session_state.dashboard_results[existing_idx]
-                            existing["Snippet"] += "\n---\n" + snippet
-                            existing["Score"] = max(existing["Score"], score)
-                            old_signals = set(existing["Signals"].split(" | "))
-                            new_signals = set(breakdown)
-                            existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
-                            if conf == "High":
-                                existing["Confidence"] = "High"
-                            elif conf == "Medium" and existing["Confidence"] == "Low":
-                                existing["Confidence"] = "Medium"
-                        else:
-                            temp_first_pass.append({
-                                "Name": name,
-                                "Title": title,
-                                "Snippet": snippet,
-                                "URL": url,
-                                "Score": score,
-                                "Confidence": conf,
-                                "Signals": " | ".join(breakdown),
-                                "Enriched Company": enriched_company
-                            })
-                            st.write(f"✓ Found: **{name}**")
-                        
-                        progress_bar.progress((idx + 1) / total)
-                        time.sleep(0.1)
-                
-                first_pass_status.update(label="First Pass Complete", state="complete")
-            
-            # Second Pass Container
-            if temp_first_pass:
-                second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
-                with second_pass_status:
-                    st.write("Verifying investor credentials...")
-                    verify_progress = st.progress(0)
-                    
-                    temp_second_pass = []
-                    
-                    for idx, person in enumerate(temp_first_pass):
-                        name = person["Name"]
-                        enriched_company = person.get("Enriched Company", "")
-                        snippet = person.get("Snippet", "")
-                        
-                        st.write(f"Verifying: **{name}**")
-                        
-                        anchors = second_pass.extract_anchors(snippet)
-                        queries = second_pass.build_second_pass_queries(name, anchors, enriched_company)
-                        
-                        state = {
-                            "identity_confirmed": False,
-                            "geo_hits": 0,
-                            "linkedin_hits": 0,
-                            "domain_hits": set(),
-                            "expected_name": name
-                        }
-                        
-                        with DDGS(timeout=10) as ddgs:
-                            for q in queries[:2]:
-                                try:
-                                    verification_results = list(ddgs.text(q, max_results=3, backend="lite"))
-                                    
-                                    for vr in verification_results:
-                                        url = vr.get("href", "")
-                                        if not url:
-                                            continue
-                                        
-                                        text = f"{vr.get('title', '')} {vr.get('body', '')}"
-                                        score2, breakdown2, confirmed = second_pass.score_second_pass(text, url, state)
-                                        
-                                        if score2 > 0:
-                                            temp_second_pass.append({
-                                                "Name": name,
-                                                "Query Used": q,
-                                                "Snippet": text,
-                                                "Second Pass Score": score2,
-                                                "Score Breakdown": " | ".join(breakdown2),
-                                                "Source URL": url
-                                            })
-                                    
-                                    time.sleep(0.5)
-                                except Exception as e:
-                                    continue
-                        
-                        verify_progress.progress((idx + 1) / len(temp_first_pass))
-                        time.sleep(0.1)
-                    
-                    second_pass_status.update(label="Verification Complete", state="complete")
-            
-            # Update session state with new results
-            st.session_state.dashboard_verified.extend(temp_second_pass)
-            
-            # Consolidate new results
-            for person in temp_first_pass:
-                name = person["Name"]
-                first_pass_score = person["Score"]
-                enriched_company = person.get("Enriched Company", "")
-                url = person.get("URL", "")
-                signals = person.get("Signals", "")
-                
-                # Extract keywords
-                identity_kws = extract_keywords_from_signals(signals, identity_keywords)
-                geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
-                
-                # Check if verified
-                df_second = pd.DataFrame(st.session_state.dashboard_verified)
-                if not df_second.empty and name in df_second["Name"].values:
-                    person_verified = df_second[df_second["Name"] == name]
-                    second_pass_total = min(person_verified["Second Pass Score"].sum(), 10.0)
-                    final_score = (first_pass_score + second_pass_total) / 2
-                else:
-                    second_pass_total = 0.0
-                    final_score = first_pass_score / 2
-                
-                # Determine verdict
-                verdict = "Green List" if final_score >= 5.0 else "Red List"
-                
-                st.session_state.dashboard_results.append({
-                    "Name": name,
-                    "Company": enriched_company,
-                    "Identity Keywords": identity_kws,
-                    "Geo Keywords": geo_kws,
-                    "Score": final_score,
-                    "Final Verdict": verdict,
-                    "URL": url
-                })
-            
-            st.success("Discovery Complete!")
-            st.rerun()
     
     # ==================== FILTER TOGGLE ====================
     if st.session_state.dashboard_results:
@@ -706,6 +543,7 @@ def run_dashboard():
                 company = result.get("Company", "")
                 identity_kws = result.get("Identity Keywords", [])
                 geo_kws = result.get("Geo Keywords", [])
+                seniority_kws = result.get("Seniority Keywords", [])
                 score = result.get("Score", 0)
                 verdict = result.get("Final Verdict", "Red List")
                 url = result.get("URL", "#")
@@ -721,6 +559,7 @@ def run_dashboard():
                     
                     <div style="margin-bottom: 12px;">
                         {''.join([f'<span class="badge badge-identity">{kw.title()}</span>' for kw in identity_kws[:3]])}
+                        {''.join([f'<span class="badge badge-seniority">{kw.title()}</span>' for kw in seniority_kws[:3]])}
                         {''.join([f'<span class="badge badge-geo">{kw.upper()}</span>' for kw in geo_kws[:3]])}
                     </div>
                     
@@ -745,6 +584,7 @@ def run_dashboard():
                     company = result.get("Company", "")
                     identity_kws = result.get("Identity Keywords", [])
                     geo_kws = result.get("Geo Keywords", [])
+                    seniority_kws = result.get("Seniority Keywords", [])
                     score = result.get("Score", 0)
                     verdict = result.get("Final Verdict", "Red List")
                     url = result.get("URL", "#")
@@ -760,6 +600,7 @@ def run_dashboard():
                         
                         <div style="margin-bottom: 12px;">
                             {''.join([f'<span class="badge badge-identity">{kw.title()}</span>' for kw in identity_kws[:3]])}
+                            {''.join([f'<span class="badge badge-seniority">{kw.title()}</span>' for kw in seniority_kws[:3]])}
                             {''.join([f'<span class="badge badge-geo">{kw.upper()}</span>' for kw in geo_kws[:3]])}
                         </div>
                         
@@ -776,8 +617,20 @@ def run_dashboard():
                     st.progress(score / 10, text=f"AI Confidence: {score:.1f}/10")
                     st.markdown("<br>", unsafe_allow_html=True)
         
-        # ==================== DOWNLOAD CSV ====================
+        # ==================== DISCOVER MORE & DOWNLOAD CSV ====================
         st.markdown("---")
+        
+        # Discover More Button
+        col_more1, col_more2, col_more3 = st.columns([1, 2, 1])
+        with col_more2:
+            discover_more_button = st.button("Discover More", use_container_width=True)
+        
+        if discover_more_button:
+            # Trigger discovery without creating a new section
+            st.session_state.trigger_discovery = True
+            st.rerun()
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # Prepare CSV data
         csv_data = []
@@ -786,6 +639,7 @@ def run_dashboard():
                 "Name": r.get("Name", ""),
                 "Company": r.get("Company", ""),
                 "Identity Keywords": ", ".join(r.get("Identity Keywords", [])),
+                "Seniority Keywords": ", ".join(r.get("Seniority Keywords", [])),
                 "Geo Keywords": ", ".join(r.get("Geo Keywords", [])),
                 "AI Confidence Score": f"{r.get('Score', 0):.1f}",
                 "Verdict": r.get("Final Verdict", ""),
@@ -804,4 +658,3 @@ def run_dashboard():
                 mime="text/csv",
                 use_container_width=True
             )
-
