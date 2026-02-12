@@ -139,7 +139,7 @@ def run_dashboard():
             try:
                 with DDGS() as ddgs:
                     # Fetching slightly more results to ensure quality after noise removal
-                    results = list(ddgs.text(query, max_results=15, backend="lite"))
+                    results = list(ddgs.text(query, max_results=5, backend="lite"))
                     
                     for r in results:
                         url = normalize_url(r.get("href", ""))
@@ -168,7 +168,7 @@ def run_dashboard():
                         if queries:
                             time.sleep(0.4) # Ethical delay
                             try:
-                                v_res = list(ddgs.text(queries[0], max_results=3, backend="lite"))
+                                v_res = list(ddgs.text(queries[0], max_results=5, backend="lite"))
                                 state = {"linkedin_seen":False, "geo_hits":0, "identity_confirmed":False, 
                                          "domain_hits":set(), "expected_name":name.lower(), "linkedin_hits":0}
                                 for vr in v_res:
