@@ -27,11 +27,6 @@ def run_dashboard():
         max-width: 1200px;
     }
                 
-    h1 {
-        text-align: center;
-        width: 100%;
-    }
-                
     /* Metric cards styling */
     [data-testid="stMetricValue"] {
         font-size: 2rem;
@@ -212,8 +207,8 @@ def run_dashboard():
     """, unsafe_allow_html=True)
     
     # ==================== HEADER ====================
-    st.title("UAE Investor Discovery Platform")
-    st.markdown("### AI-Powered Lead Intelligence for High-Value Investors")
+    st.markdown("<h1 style='text-align: center;'>🔍 UAE Investor Discovery Platform</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #6B7280;'>AI-Powered Lead Intelligence for High-Value Investors</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
     # ==================== SESSION STATE INITIALIZATION ====================
