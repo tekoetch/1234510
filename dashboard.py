@@ -475,6 +475,8 @@ def run_dashboard():
             enriched_company = person.get("Enriched Company", "")
             url = person.get("URL", "")
             signals = person.get("Signals", "")
+            title = person.get("Title", "") # Added to preserve metadata
+            snippet = person.get("Snippet", "") # Added to preserve metadata
             
             # Extract keywords
             identity_kws = extract_keywords_from_signals(signals, identity_keywords)
@@ -501,7 +503,10 @@ def run_dashboard():
                 "Seniority Keywords": seniority_kws,
                 "Score": final_score,
                 "Final Verdict": verdict,
-                "URL": url
+                "URL": url,
+                "Title": title,     # Preserves for duplicate checking
+                "Snippet": snippet, # Preserves for duplicate checking
+                "Signals": signals  # Preserves for keyword extraction
             })
         
         # Update results in session state
