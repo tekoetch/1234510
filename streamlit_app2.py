@@ -6,6 +6,8 @@ import time
 import joblib
 import numpy as np
 
+st.set_page_config(page_title="UAE Investor Discovery", layout="wide")
+
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords)
 import second_pass 
 from dashboard import run_dashboard
@@ -28,7 +30,7 @@ if "second_pass_results" not in st.session_state:
     st.session_state.second_pass_results = []
 
 st.sidebar.title("Sidebar")
-choice = st.sidebar.radio("Switch View:", ["Dashboard", "Testing dashboard", "AI model generation"])
+choice = st.sidebar.radio("Switch View:", ["Testing dashboard", "Dashboard", "AI model generation"])
 
 if choice == "Dashboard":
     run_dashboard()
