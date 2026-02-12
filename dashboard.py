@@ -26,7 +26,7 @@ def run_dashboard():
         padding-bottom: 2rem;
         max-width: 1200px;
     }
-                
+    
     /* Metric cards styling */
     [data-testid="stMetricValue"] {
         font-size: 2rem;
@@ -83,14 +83,7 @@ def run_dashboard():
         font-weight: 600;
         margin-right: 8px;
         margin-bottom: 8px;
-        backdrop-filter: blur(4px);
     }
-                
-    .badge:hover {
-        transform: scale(1.05);
-        transition: transform 0.2s ease;
-        cursor: default;
-    }            
     
     .badge-identity {
         background-color: #DBEAFE;
@@ -207,8 +200,8 @@ def run_dashboard():
     """, unsafe_allow_html=True)
     
     # ==================== HEADER ====================
-    st.markdown("<h1 style='text-align: center;'>🔍 UAE Investor Discovery Platform</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #6B7280;'>AI-Powered Lead Intelligence for High-Value Investors</h3>", unsafe_allow_html=True)
+    st.title("🔍 UAE Investor Discovery Platform")
+    st.markdown("### AI-Powered Lead Intelligence for High-Value Investors")
     st.markdown("---")
     
     # ==================== SESSION STATE INITIALIZATION ====================
@@ -272,11 +265,20 @@ def run_dashboard():
             if kw in signals_lower:
                 found.append(kw)
         
-        # Remove "angel" if "angel investor" is present
-        if "angel investor" in found and "angel" in found:
-            found.remove("angel")
+        # Remove shorter keywords if longer versions exist (prevents duplicates)
+        # e.g., remove "angel" if "angel investor" exists
+        # e.g., remove "partner" if "managing partner" exists
+        found_set = set(found)
+        to_remove = set()
         
-        return list(set(found))
+        for keyword in found:
+            # Check if any other keyword contains this one as a substring
+            for other_keyword in found:
+                if keyword != other_keyword and keyword in other_keyword:
+                    to_remove.add(keyword)
+                    break
+        
+        return [kw for kw in found if kw not in to_remove]
     
     # ==================== METRICS SECTION ====================
     col1, col2, col3 = st.columns(3)
@@ -320,7 +322,7 @@ def run_dashboard():
     # ==================== DISCOVER BUTTON ====================
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
-        discover_button = st.button("Discover UAE Investors", use_container_width=True, type="primary")
+        discover_button = st.button("🚀 Discover UAE Investors", use_container_width=True, type="primary")
     
     # Check if discovery should run (either main button or "Discover More")
     should_discover = discover_button or st.session_state.trigger_discovery
@@ -382,9 +384,11 @@ def run_dashboard():
                     existing_idx = find_existing_person(url, st.session_state.dashboard_results)
                     if existing_idx is not None:
                         existing = st.session_state.dashboard_results[existing_idx]
-                        existing["Snippet"] += "\n---\n" + snippet
-                        existing["Score"] = max(existing["Score"], score)
-                        old_signals = set(existing["Signals"].split(" | "))
+                        # Safely update existing entry with .get() methods
+                        if "Snippet" in existing:
+                            existing["Snippet"] += "\n---\n" + snippet
+                        existing["Score"] = max(existing.get("Score", 0), score)
+                        old_signals = set(existing.get("Signals", "").split(" | "))
                         new_signals = set(breakdown)
                         existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
                         if conf == "High":
@@ -482,13 +486,13 @@ def run_dashboard():
             enriched_company = person.get("Enriched Company", "")
             url = person.get("URL", "")
             signals = person.get("Signals", "")
-            title = person.get("Title", "") # Added to preserve metadata
-            snippet = person.get("Snippet", "") # Added to preserve metadata
+            title = person.get("Title", "")  # Preserve for duplicate checking
+            snippet = person.get("Snippet", "")  # Preserve for duplicate checking
             
             # Extract keywords
             identity_kws = extract_keywords_from_signals(signals, identity_keywords)
             geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
-            seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)
+            seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)  # Define seniority keywords
             
             # Check if verified
             if not df_second.empty and name in df_second["Name"].values:
@@ -503,19 +507,23 @@ def run_dashboard():
             verdict = "Green List" if final_score >= 5.0 else "Red List"
             
             consolidated.append({
-                            "Name": name,
-                            "Company": enriched_company,
-                            "Identity Keywords": identity_kws,
-                            "Geo Keywords": geo_kws,
-                            "Seniority Keywords": seniority_kws,
-                            "Score": final_score,
-                            "Final Verdict": verdict,
-                            "URL": url,
-                            "Title": person.get("Title", ""),
-                            "Snippet": person.get("Snippet", ""),
-                            "Signals": signals,
-                            "Confidence": person.get("Confidence", "Low")
-                        })
+                "Name": name,
+                "Company": enriched_company,
+                "Identity Keywords": identity_kws,
+                "Geo Keywords": geo_kws,
+                "Seniority Keywords": seniority_kws,
+                "Score": final_score,
+                "Final Verdict": verdict,
+                "URL": url,
+                "Title": title,  # Preserve for duplicate checking
+                "Snippet": snippet,  # Preserve for duplicate checking
+                "Signals": signals,  # Preserve for keyword extraction
+                "Confidence": person.get("Confidence", "Low")  # Preserve confidence
+            })
+                "Score": final_score,
+                "Final Verdict": verdict,
+                "URL": url
+            })
         
         # Update results in session state
         st.session_state.dashboard_results = []
