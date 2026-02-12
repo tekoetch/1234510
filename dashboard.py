@@ -97,10 +97,8 @@ def clean_dataframe_for_display(df):
 
 def run_dashboard():
     # Title Section
-    c1= st.columns([2, 1])
-    with c1:
-        st.title("TekhLeads UAE Investor Discovery")
-        st.caption("AI-Powered Lead Intelligence for finding high-potential leads")
+    st.title("TekhLeads UAE Investor Discovery")
+    st.caption("AI-Powered Lead Intelligence for finding high-potential leads")
 
     st.markdown("---")
 
