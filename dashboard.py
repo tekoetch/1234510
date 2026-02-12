@@ -1,236 +1,382 @@
 import streamlit as st
+from ddgs import DDGS
 import pandas as pd
 import time
-import random
+import re
 
-# Import your existing backend logic
-# Ensure these files are in the same directory
-from first_pass import score_text, identity_keywords, behavior_keywords, uae_keywords
-from second_pass import NOISE_DOMAINS, BONUS_DOMAINS
+# --- STRICT IMPORTS FROM YOUR BACKEND ---
+# We use your exact logic to ensure authentic results
+from first_pass import score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords
+import second_pass 
 
-# --- CONFIGURATION & STYLING ---
-st.set_page_config(page_title="TekhLeads UAE Investor Discovery", layout="wide")
+# --- CONFIGURATION & CSS ---
+st.set_page_config(page_title="TekhLeads | Investor Intelligence", layout="wide", page_icon="💎")
 
-# Custom CSS for that "Premium SaaS" look
-# - Hides default Streamlit menu/footer for a clean video
-# - Styles the "Green List" metrics
-# - Adds whitespace for breathing room
 st.markdown("""
 <style>
+    /* HIDE STREAMLIT CHROME */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Premium Card Metric Styling */
-    div[data-testid="stMetric"] {
-        background-color: #f9f9f9;
-        border: 1px solid #e0e0e0;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    /* CARD STYLING */
+    .investor-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #f0f2f6;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        transition: transform 0.2s;
+    }
+    .investor-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        border-color: #0068C9;
     }
     
-    /* Custom Button Styling */
-    div.stButton > button {
-        width: 100%;
-        background-color: #0068C9;
-        color: white;
-        font-weight: bold;
-        border-radius: 8px;
-        height: 50px;
+    /* TYPOGRAPHY */
+    .card-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 5px;
+    }
+    .card-role {
+        font-size: 16px;
+        color: #6b7280;
+        margin-bottom: 12px;
+    }
+    
+    /* BADGES & TAGS */
+    .score-badge-green {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        float: right;
+    }
+    .score-badge-red {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        float: right;
+    }
+    .tag-pill {
+        display: inline-block;
+        background-color: #f3f4f6;
+        color: #374151;
+        padding: 2px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-right: 6px;
+        margin-top: 6px;
+    }
+    
+    /* LINK BUTTON */
+    .linkedin-btn {
+        display: inline-block;
+        text-decoration: none;
+        color: #0077b5;
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: 15px;
+    }
+    .linkedin-btn:hover {
+        text-decoration: underline;
+    }
+    
+    /* METRICS CONTAINER */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        padding: 20px;
+        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # --- HELPER FUNCTIONS ---
 
-def fake_stream_output(text):
-    """Simulates a typewriter effect for the 'AI thinking' look in the demo."""
-    for word in text.split():
-        yield word + " "
-        time.sleep(0.05)
+def normalize_url(url):
+    return url.split("?")[0].lower().strip()
 
-def clean_dataframe_for_display(df):
-    """Prepares the raw data for the sleek UI."""
-    if df.empty:
-        return df
+def clean_signal_text(signal_list_str):
+    """
+    Parses the raw 'Signals' string from first_pass.py (e.g., '#uae = geography (+0.6)')
+    into clean, readable tags for the UI.
+    """
+    if not isinstance(signal_list_str, str):
+        return []
     
-    display_df = df.copy()
+    raw_signals = signal_list_str.split(" | ")
+    clean_tags = []
     
-    # 1. Rename columns for display
-    display_df = display_df.rename(columns={
-        "Name": "Name",
-        "Enriched Company": "Affiliation",
-        "Final Score": "Trust Score",
-        "Final Verdict": "Status"
-    })
-    
-    # 2. Add a 'Profile' column that is just the URL (Streamlit will format this)
-    if "Source" in display_df.columns:
-        display_df["LinkedIn"] = display_df["Source"]
-    elif "URL" in display_df.columns:
-        display_df["LinkedIn"] = display_df["URL"]
+    for s in raw_signals:
+        # Remove the score part like (+0.6)
+        s_base = s.split("(")[0].strip()
+        # Remove hash and grouping info like '#uae = geography'
+        if "=" in s_base:
+            # Take the part before '=', remove #
+            tag_name = s_base.split("=")[0].replace("#", "").strip()
+        else:
+            tag_name = s_base
+            
+        # Capitalize
+        clean_tags.append(tag_name.title())
         
-    # 3. Create a clean 'Signals' column
-    # Combine identity/geo/behavior into one readable tag string
-    def combine_signals(row):
-        signals = []
-        # We need to safely check if these columns exist or parse them from breakdown
-        # For this demo, we assume they might be in the 'Breakdown' or separate cols
-        # This is a simplified logic for the visual demo
-        score = row.get("Trust Score", 0)
-        if score > 8: signals.append("High Potential")
-        if "UAE" in str(row): signals.append("United Arab Emirates")
-        if "angel" in str(row).lower(): signals.append("Angel Investor")
-        return ", ".join(signals)
+    # Deduplicate and limit to 4 tags for UI cleanliness
+    return list(dict.fromkeys(clean_tags))[:5]
 
-    display_df["Signals"] = display_df.apply(combine_signals, axis=1)
-
-    # 4. Filter to only show relevant columns
-    cols_to_show = ["Name", "Affiliation", "Trust Score", "Status", "Signals", "LinkedIn"]
-    # Only keep columns that actually exist
-    final_cols = [c for c in cols_to_show if c in display_df.columns]
+def render_lead_card(lead):
+    """
+    Renders a single lead as a beautiful HTML card.
+    """
+    score = lead.get("Final Score", 0)
+    is_green = lead.get("Final Verdict") == "GREAT" or lead.get("Final Verdict") == "GOOD"
+    badge_class = "score-badge-green" if is_green else "score-badge-red"
+    verdict_text = "Highly Recommended" if is_green else "Review Needed"
     
-    return display_df[final_cols]
+    # Clean up signals
+    signals = clean_signal_text(lead.get("Signals", ""))
+    tags_html = "".join([f'<span class="tag-pill">{tag}</span>' for tag in signals])
+    
+    # Company Display
+    company = lead.get("Enriched Company")
+    if not company:
+        company = "Private Investor / Undisclosed"
+    
+    # Card HTML
+    html = f"""
+    <div class="investor-card">
+        <span class="{badge_class}">{score}/10</span>
+        <div class="card-name">{lead['Name']}</div>
+        <div class="card-role">🏢 {company}</div>
+        <div style="margin-bottom:10px;">
+            {tags_html}
+        </div>
+        <div style="font-size:13px; color:#9ca3af; margin-top:8px; font-style:italic;">
+            "{lead.get('Snippet', '')[:90]}..."
+        </div>
+        <a href="{lead.get('URL', '#')}" target="_blank" class="linkedin-btn">
+            View LinkedIn Profile ↗
+        </a>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
-# --- MAIN APP FLOW ---
+# --- CORE LOGIC ---
 
 def run_dashboard():
-    # Title Section
-    st.title("TekhLeads UAE Investor Discovery")
-    st.caption("AI-Powered Lead Intelligence for finding high-potential leads")
+    # Header
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.title("TekhLeads | Investor Discovery")
+        st.caption("Auto-Agent: Target Region **UAE** • Strategy **Angel Investors**")
+    
+    # Initialize Session State
+    if "db_leads" not in st.session_state:
+        st.session_state.db_leads = []
+    if "db_processed_urls" not in st.session_state:
+        st.session_state.db_processed_urls = set()
 
     st.markdown("---")
 
-    # 1. INPUT SECTION
+    # 1. CONTROL PANEL
     with st.container():
-        col_search, col_btn = st.columns([4, 1])
+        # Using columns to center or align buttons
+        col_act, col_filter = st.columns([1, 4])
         
-        with col_search:
-            # Pre-filled for the demo video smoothness
-            query = st.text_input(
-                "Target Persona", 
-                value="Real Estate Investors", 
-                placeholder="e.g. Fintech Angels, Family Offices..."
-            )
+        with col_act:
+            # THE ONE BUTTON
+            start_btn = st.button("🚀 Launch AI Agent", type="primary")
+            
+        with col_filter:
+            # A toggle to filter results instantly
+            show_green_only = st.toggle("Show Green List Candidates Only", value=True)
+
+    # 2. LIVE PROCESSING LOOP
+    if start_btn:
+        st.session_state.db_leads = [] # Clear previous run for the demo
         
-        with col_btn:
-            st.write("") # Spacer
-            st.write("") # Spacer
-            run_btn = st.button("Find Leads")
-
-    # Initialize State
-    if "leads" not in st.session_state:
-        st.session_state.leads = pd.DataFrame()
-    if "is_searching" not in st.session_state:
-        st.session_state.is_searching = False
-
-    # 2. EXECUTION LOGIC
-    if run_btn:
-        st.session_state.is_searching = True
+        # We use a progress container to show the "AI Thinking"
+        status_container = st.status("Initializing Agent...", expanded=True)
         
-        # VISUAL: Progress Status
-        with st.status("AI Agent Active", expanded=True) as status:
+        try:
+            # STEP A: PUBLIC DISCOVERY (First Pass)
+            status_container.write("📡 Scanning public directories (LinkedIn UAE)...")
             
-            # Step 1: First Pass
-            st.write("Running Search...")
-            # In a real demo, we might want to simulate a slight delay so viewers can read
-            time.sleep(1.0) 
+            # HARDCODED QUERY as requested
+            query = '"angel investor" UAE site:linkedin.com/in'
             
-            # --- HOOK INTO YOUR EXISTING CODE HERE ---
-            # Ideally, import `first_pass_search` from your main file or replicate logic
-            # For this standalone file, I will simulate the structure based on your description
-            # REPLACE THIS WITH ACTUAL FUNCTION CALL: 
-            # results_fp = first_pass.run_search(query + " uae", num_results=10)
+            # Run DDGS (Live Data)
+            # We run a loop to get enough candidates
+            found_candidates = []
             
-            # *Simulating* data for the perfect demo video if backend is unstable
-            # Remove this block and uncomment above when ready
-            st.write("Identifying high-potential candidates...")
-            time.sleep(1.0)
-            
-            st.write("• Verifying geography and investor relevance...")
-            time.sleep(1.0)
-            
-            status.update(label="Discovery Complete", state="complete", expanded=False)
+            with DDGS() as ddgs:
+                # Fetching 15 results to ensure we get some hits
+                results = list(ddgs.text(query, max_results=15, backend="lite"))
+                
+                status_container.write(f"✓ Found {len(results)} raw profiles. Analyzing signals...")
+                progress_bar = status_container.progress(0)
+                
+                for idx, r in enumerate(results):
+                    url = r.get("href", "")
+                    if not url: continue
+                    
+                    # Deduplication
+                    norm_url = normalize_url(url)
+                    if norm_url in st.session_state.db_processed_urls:
+                        continue
+                    st.session_state.db_processed_urls.add(norm_url)
 
-        # 3. CONSOLIDATION (Simulated for Demo Visuals - Replace with your `df_consolidated` logic)
-        # This ensures your video looks perfect even if the live DDGS search hits a rate limit
-        data = [
-            {"Name": "Khalid Al-Mansoori", "Enriched Company": "Emaar Properties / Private Office", "Final Score": 9.2, "Final Verdict": "GREEN LIST", "URL": "https://linkedin.com/in/example1", "Text": "Angel investor based in Dubai UAE"},
-            {"Name": "Sarah Johnson", "Enriched Company": "Global Ventures", "Final Score": 8.5, "Final Verdict": "GREEN LIST", "URL": "https://linkedin.com/in/example2", "Text": "Partner at VC fund, investing in MENA"},
-            {"Name": "Rajiv Mehta", "Enriched Company": "Sobha Realty", "Final Score": 7.8, "Final Verdict": "GREEN LIST", "URL": "https://linkedin.com/in/example3", "Text": "Director, active investor in proptech"},
-            {"Name": "Amira Youssef", "Enriched Company": "Unknown", "Final Score": 4.2, "Final Verdict": "RED LIST", "URL": "https://linkedin.com/in/example4", "Text": "Student at University of Dubai"},
-            {"Name": "James Wright", "Enriched Company": "Consultant", "Final Score": 3.5, "Final Verdict": "RED LIST", "URL": "https://linkedin.com/in/example5", "Text": "Looking for investment opportunities"},
-        ]
-        st.session_state.leads = pd.DataFrame(data)
+                    # Scoring (First Pass)
+                    title = r.get("title", "")
+                    snippet = r.get("body", "")
+                    text_blob = f"{title} {snippet}"
+                    
+                    score1, conf, breakdown, enriched_comp = score_text(text_blob, query, url)
+                    
+                    # Filter: Only proceed if it looks somewhat promising (Score > 3)
+                    if score1 >= 3.0:
+                        candidate = {
+                            "Name": title.split("|")[0].split("-")[0].strip(), # Simple name clean
+                            "URL": url,
+                            "Snippet": snippet,
+                            "Score1": score1,
+                            "Enriched Company": enriched_comp,
+                            "Signals": " | ".join(breakdown),
+                            "Title": title
+                        }
+                        found_candidates.append(candidate)
+                    
+                    # Update Progress
+                    progress_bar.progress((idx + 1) / len(results))
+                    time.sleep(0.1) # Tiny sleep for visual smoothness in video
 
-    # 4. RESULTS DISPLAY
-    if not st.session_state.leads.empty:
-        df = st.session_state.leads
+            # STEP B: VERIFICATION (Second Pass)
+            if found_candidates:
+                status_container.write(f"🕵️ Verifying {len(found_candidates)} candidates...")
+                
+                final_results = []
+                
+                for i, cand in enumerate(found_candidates):
+                    # Show who we are verifying currently
+                    status_container.update(label=f"Verifying: {cand['Name']}...", state="running")
+                    
+                    # 1. Build Verification Query
+                    # We use the logic from second_pass.py (imports)
+                    anchors = second_pass.extract_anchors(cand["Snippet"])
+                    queries = second_pass.build_second_pass_queries(cand["Name"], anchors, cand["Enriched Company"])
+                    
+                    # 2. Run Verification Search (Just 1 query per person for speed in demo)
+                    sp_score = 0
+                    sp_breakdown = []
+                    
+                    if queries:
+                        # Safety delay for DDGS
+                        time.sleep(0.5) 
+                        try:
+                            v_results = list(ddgs.text(queries[0], max_results=3, backend="lite"))
+                            
+                            # State object required by second_pass.score_second_pass
+                            state = {
+                                "linkedin_seen": False, "geo_hits": 0,
+                                "identity_confirmed": False, "domain_hits": set(),
+                                "expected_name": cand["Name"].lower(), "linkedin_hits": 0
+                            }
+                            
+                            for vr in v_results:
+                                v_text = f"{vr.get('title','')} {vr.get('body','')}"
+                                s2, b2, _ = second_pass.score_second_pass(v_text, vr.get("href",""), state)
+                                if s2 > 0:
+                                    sp_score += s2
+                                    sp_breakdown.extend(b2)
+                        except:
+                            pass # Fail gracefully on connection error
+                            
+                    # 3. Consolidation Logic
+                    final_score = (cand["Score1"] + min(sp_score, 10)) / 2
+                    
+                    # Verdict
+                    if final_score >= 8.0: verdict = "GREAT"
+                    elif final_score >= 5.0: verdict = "GOOD"
+                    else: verdict = "REJECT"
+                    
+                    # Update Signals
+                    all_signals = cand["Signals"]
+                    if sp_breakdown:
+                        all_signals += " | " + " | ".join(sp_breakdown)
+
+                    final_results.append({
+                        "Name": cand["Name"],
+                        "Enriched Company": cand["Enriched Company"],
+                        "Final Score": round(final_score, 1),
+                        "Final Verdict": verdict,
+                        "URL": cand["URL"],
+                        "Signals": all_signals,
+                        "Snippet": cand["Snippet"]
+                    })
+                
+                # Save to session
+                st.session_state.db_leads = final_results
+                status_container.update(label="Discovery Complete", state="complete", expanded=False)
+            else:
+                status_container.error("No candidates found. Try again later.")
+                
+        except Exception as e:
+            status_container.error(f"Search interrupted: {e}")
+
+    # 3. RESULTS DISPLAY (The Premium Cards)
+    
+    if st.session_state.db_leads:
+        df = pd.DataFrame(st.session_state.db_leads)
         
-        # Top Level Metrics
+        # METRICS ROW
         m1, m2, m3 = st.columns(3)
-        green_list_count = len(df[df["Final Verdict"] == "GREEN LIST"])
-        avg_score = df["Final Score"].mean()
         
-        m1.metric("Total Candidates", len(df))
-        m2.metric("Green List Leads", green_list_count, delta="High Quality")
-        m3.metric("Avg Trust Score", f"{avg_score:.1f}/10")
+        green_leads = df[(df["Final Verdict"] == "GREAT") | (df["Final Verdict"] == "GOOD")]
+        count_total = len(df)
+        count_green = len(green_leads)
+        yield_rate = int((count_green / count_total) * 100) if count_total > 0 else 0
+        
+        m1.metric("Total Profiles Analyzed", count_total)
+        m2.metric("Green List Leads", count_green)
+        m3.metric("High Value Yield", f"{yield_rate}%")
         
         st.divider()
         
-        st.subheader("Verified Candidates")
+        # FILTERING
+        leads_to_show = green_leads if show_green_only else df
+        leads_to_show = leads_to_show.sort_values(by="Final Score", ascending=False)
+
+        if leads_to_show.empty:
+            st.info("No leads met the criteria.")
+        else:
+            # RENDER CARDS
+            # We use a 2-column grid layout for the cards
+            grid_cols = st.columns(2)
+            
+            for index, row in leads_to_show.iterrows():
+                # Alternate columns
+                with grid_cols[index % 2]:
+                    render_lead_card(row)
         
-        # Filter Toggle
-        show_green_only = st.toggle("Show Green List Only", value=True)
-        
-        display_df = clean_dataframe_for_display(df)
-        
-        if show_green_only:
-            display_df = display_df[display_df["Status"] == "GREEN LIST"]
-        
-        # THE PREMIUM TABLE CONFIGURATION
-        st.dataframe(
-            display_df,
-            use_container_width=True,
-            column_config={
-                "LinkedIn": st.column_config.LinkColumn(
-                    "LinkedIn Profile",
-                    display_text="View Profile",
-                    help="Click to open LinkedIn Profile"
-                ),
-                "Trust Score": st.column_config.ProgressColumn(
-                    "AI Confidence",
-                    format="%.1f",
-                    min_value=0,
-                    max_value=10,
-                ),
-                "Status": st.column_config.Column(
-                    "Verdict",
-                    width="medium",
-                ),
-                "Affiliation": st.column_config.TextColumn(
-                    "Affiliation",
-                    width="large"
-                )
-            },
-            hide_index=True
-        )
-        
-        # Load More / Download Actions
-        col_load, col_dl = st.columns([1, 4])
-        with col_load:
-            if st.button("Load More"):
-                with st.spinner("Searching..."):
-                    time.sleep(2)
-                    st.toast("Rate limit reached on demo tier.", icon="⚠️")
-        with col_dl:
+        # FOOTER ACTIONS
+        st.divider()
+        c_dl, c_more = st.columns([1, 4])
+        with c_dl:
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                "Export Excel",
+                "📥 Download CSV",
                 data=csv,
-                file_name="investor_leads.csv",
-                mime="text/csv",
+                file_name="investor_leads_uae.csv",
+                mime="text/csv"
             )
 
 if __name__ == "__main__":
