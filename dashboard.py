@@ -99,9 +99,9 @@ def run_dashboard():
     }
     
     .badge-geo {
-        background-color: #D1FAE5;
-        color: #065F46;
-        border: 1px solid #6EE7B7;
+        background-color: #FEF3C7;
+        color: #92400E;
+        border: 1px solid #FCD34D;
     }
     
     .badge-seniority {
@@ -191,6 +191,12 @@ def run_dashboard():
         background-color: #059669;
     }
     
+    /* Bring progress bar very close to card */
+    div[data-testid="stProgress"] {
+        margin-top: -8px !important;
+        margin-bottom: 20px !important;
+    }
+    
     /* Checkbox styling */
     .stCheckbox {
         font-size: 1rem;
@@ -218,6 +224,8 @@ def run_dashboard():
         st.session_state.dashboard_verified = []
     if "trigger_discovery" not in st.session_state:
         st.session_state.trigger_discovery = False
+    if "first_discovery_done" not in st.session_state:
+        st.session_state.first_discovery_done = False
     
     # ==================== HELPER FUNCTIONS ====================
     blocked_urls = [
@@ -281,6 +289,16 @@ def run_dashboard():
         
         return list(set(found))
     
+    def format_badge_text(keyword):
+        """Format keyword for badge display, keeping acronyms uppercase"""
+        acronyms = ["ceo", "cio", "cfo", "cto", "coo", "vp", "uae", "gcc", "mena", "ai", "usa", "uk"]
+        keyword_lower = keyword.lower()
+        
+        if keyword_lower in acronyms:
+            return keyword.upper()
+        else:
+            return keyword.title()
+    
     # ==================== METRICS SECTION ====================
     col1, col2, col3 = st.columns(3)
     
@@ -321,21 +339,37 @@ def run_dashboard():
     st.markdown("---")
     
     # ==================== DISCOVER BUTTON ====================
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    with col_btn2:
-        discover_button = st.button("Discover UAE Investors", use_container_width=True, type="primary")
+    if not st.session_state.first_discovery_done:
+        # Show initial discovery button
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            discover_button = st.button("🚀 Discover UAE Investors", use_container_width=True, type="primary")
+        
+        should_discover = discover_button
+    else:
+        # After first discovery, show info message with reset option
+        col_info1, col_info2, col_info3 = st.columns([1, 2, 1])
+        with col_info2:
+            st.info("✓ Search active. Scroll down and use 'Discover More' to find additional leads.")
+            if st.button("🔄 Reset Search", use_container_width=True, key="reset_search"):
+                st.session_state.first_discovery_done = False
+                st.session_state.dashboard_results = []
+                st.session_state.dashboard_verified = []
+                st.rerun()
+        
+        should_discover = False
     
-    # Check if discovery should run (either main button or "Discover More")
-    should_discover = discover_button or st.session_state.trigger_discovery
-    
-    # Reset the trigger
+    # Check if discovery should run via trigger from "Discover More" button
     if st.session_state.trigger_discovery:
+        should_discover = True
         st.session_state.trigger_discovery = False
     
     st.markdown("<br>", unsafe_allow_html=True)
     
     # ==================== DISCOVERY PROCESS ====================
     if should_discover:
+        # Set flag that first discovery has been completed
+        st.session_state.first_discovery_done = True
         # Fixed query for UAE angel investors
         query = '"angel investor" UAE site:linkedin.com/in'
         max_results = 5
@@ -345,6 +379,7 @@ def run_dashboard():
         with first_pass_status:
             st.write("Searching LinkedIn profiles...")
             progress_bar = st.progress(0)
+            current_name_display = st.empty()  # For clearing previous names
             
             temp_first_pass = []
             
@@ -407,7 +442,8 @@ def run_dashboard():
                             "Signals": " | ".join(breakdown),
                             "Enriched Company": enriched_company
                         })
-                        st.write(f"✓ Found: **{name}**")
+                        # Update the display with current name (clears previous)
+                        current_name_display.write(f"✓ Found: **{name}**")
                     
                     progress_bar.progress((idx + 1) / total)
                     time.sleep(0.1)
@@ -421,6 +457,7 @@ def run_dashboard():
             with second_pass_status:
                 st.write("Verifying investor credentials...")
                 verify_progress = st.progress(0)
+                current_verify_display = st.empty()  # For clearing previous names
                 
                 temp_second_pass = []  # Reset for this verification run
                 
@@ -429,7 +466,8 @@ def run_dashboard():
                     enriched_company = person.get("Enriched Company", "")
                     snippet = person.get("Snippet", "")
                     
-                    st.write(f"Verifying: **{name}**")
+                    # Update the display with current name (clears previous)
+                    current_verify_display.write(f"Verifying: **{name}**")
                     
                     anchors = second_pass.extract_anchors(snippet)
                     queries = second_pass.build_second_pass_queries(name, anchors, enriched_company)
@@ -578,9 +616,9 @@ def run_dashboard():
                     {f'<div class="investor-company">at {company}</div>' if company else ''}
                     
                     <div style="margin-bottom: 12px;">
-                        {''.join([f'<span class="badge badge-identity">{kw.title()}</span>' for kw in identity_kws[:3]])}
-                        {''.join([f'<span class="badge badge-seniority">{kw.title()}</span>' for kw in seniority_kws[:3]])}
-                        {''.join([f'<span class="badge badge-geo">{kw.upper()}</span>' for kw in geo_kws[:3]])}
+                        {''.join([f'<span class="badge badge-identity">{format_badge_text(kw)}</span>' for kw in identity_kws[:3]])}
+                        {''.join([f'<span class="badge badge-seniority">{format_badge_text(kw)}</span>' for kw in seniority_kws[:3]])}
+                        {''.join([f'<span class="badge badge-geo">{format_badge_text(kw)}</span>' for kw in geo_kws[:3]])}
                     </div>
                     
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
@@ -619,9 +657,9 @@ def run_dashboard():
                         {f'<div class="investor-company">at {company}</div>' if company else ''}
                         
                         <div style="margin-bottom: 12px;">
-                            {''.join([f'<span class="badge badge-identity">{kw.title()}</span>' for kw in identity_kws[:3]])}
-                            {''.join([f'<span class="badge badge-seniority">{kw.title()}</span>' for kw in seniority_kws[:3]])}
-                            {''.join([f'<span class="badge badge-geo">{kw.upper()}</span>' for kw in geo_kws[:3]])}
+                            {''.join([f'<span class="badge badge-identity">{format_badge_text(kw)}</span>' for kw in identity_kws[:3]])}
+                            {''.join([f'<span class="badge badge-seniority">{format_badge_text(kw)}</span>' for kw in seniority_kws[:3]])}
+                            {''.join([f'<span class="badge badge-geo">{format_badge_text(kw)}</span>' for kw in geo_kws[:3]])}
                         </div>
                         
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
