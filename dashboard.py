@@ -308,7 +308,7 @@ def run_dashboard():
     if discover_button:
         # Fixed query for UAE angel investors
         query = '"angel investor" UAE site:linkedin.com/in'
-        max_results = 5
+        max_results = 10
         
         # First Pass Container
         first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
@@ -804,3 +804,4 @@ def run_dashboard():
                 mime="text/csv",
                 use_container_width=True
             )
+
