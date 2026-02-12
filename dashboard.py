@@ -385,9 +385,11 @@ def run_dashboard():
                     existing_idx = find_existing_person(url, st.session_state.dashboard_results)
                     if existing_idx is not None:
                         existing = st.session_state.dashboard_results[existing_idx]
-                        existing["Snippet"] += "\n---\n" + snippet
-                        existing["Score"] = max(existing["Score"], score)
-                        old_signals = set(existing["Signals"].split(" | "))
+                        # Safely update existing entry with .get() methods
+                        if "Snippet" in existing:
+                            existing["Snippet"] += "\n---\n" + snippet
+                        existing["Score"] = max(existing.get("Score", 0), score)
+                        old_signals = set(existing.get("Signals", "").split(" | "))
                         new_signals = set(breakdown)
                         existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
                         if conf == "High":
