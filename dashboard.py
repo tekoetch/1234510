@@ -415,13 +415,14 @@ def run_dashboard():
             first_pass_status.update(label="First Pass Complete", state="complete")
         
         # Second Pass Container
+        temp_second_pass = []  # Initialize here to prevent NameError if temp_first_pass is empty
         if temp_first_pass:
             second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
             with second_pass_status:
                 st.write("Verifying investor credentials...")
                 verify_progress = st.progress(0)
                 
-                temp_second_pass = []
+                temp_second_pass = []  # Reset for this verification run
                 
                 for idx, person in enumerate(temp_first_pass):
                     name = person["Name"]
