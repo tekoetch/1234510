@@ -36,7 +36,7 @@ MOCK_LEADS_BATCH_1 = [
         "name": "Zohaan Ahmed",
         "title": "Zohaan Ahmed - Serial Entrepreneur & Angel Investor | CEO | LinkedIn",
         "snippet": "I'm Zohaan Ahmed, a seasoned entrepreneur and angel investor passionate about helping businesses scale seamlessly across borders. --- Serial Entrepreneur & Angel Investor | CEO, 7th Sky Group | Global Business Expansion Expert (US & UAE) | Startup Growth & IT Hiring Solutions · 🌍 Zohaan Ahmed | Entrepreneur",
-        "url": "https://www.linkedin.com/in/zohaan-ahmed-5b0363b3",
+        "url": "https://ae.linkedin.com/in/zohaan-ahmed-5b0363b3",
         "enriched_company": "7th Sky Group"
     },
     {
