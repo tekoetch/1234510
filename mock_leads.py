@@ -33,11 +33,11 @@ MOCK_LEADS_BATCH_1 = [
         "enriched_company": ""
     },
     {
-        "name": "Zohaan Ahmed",
-        "title": "Zohaan Ahmed - Serial Entrepreneur & Angel Investor | CEO | LinkedIn",
-        "snippet": "I'm Zohaan Ahmed, a seasoned entrepreneur and angel investor passionate about helping businesses scale seamlessly across borders. --- Serial Entrepreneur & Angel Investor | CEO, 7th Sky Group | Global Business Expansion Expert (US & UAE) | Startup Growth & IT Hiring Solutions · 🌍 Zohaan Ahmed | Entrepreneur",
-        "url": "https://ae.linkedin.com/in/zohaan-ahmed-5b0363b3",
-        "enriched_company": "7th Sky Group"
+        "name": "Ahmed Kashif",
+        "title": "Ahmed Kashif - Business Leader | Angel Investor | FinTech",
+        "snippet": "Business Leader | Angel Investor | FinTech | Joint Ventures | REAL ESTATE · Fine knowledge from real estate lifestyle, investments with Property management, coupled with excellent communication, interpersonal and social skills has helped me in nurturing relationships, advising high end signature clients to structuring various funds facilities. Specialist: Lifestyle & Luxury",
+        "url": "https://ae.linkedin.com/in/dubaipropertiesbullandbear",
+        "enriched_company": ""
     },
     {
         "name": "Pavel Fedorov",
@@ -61,11 +61,11 @@ MOCK_LEADS_BATCH_1 = [
         "enriched_company": ""
     },
     {
-        "name": "CA Anil Jain",
-        "title": "CA Anil Jain - Fractional CFO | Chartered Accountant | Start-Ups | Angel Investor | LinkedIn",
-        "snippet": "June 7, 2025 - Fractional CFO | Chartered Accountant | Start-Ups | Angel Investor | Realtor | FMCG | Retail | Business setup | Logistics | Taxation | Fintech | HR | Tech | Automation | Agentic AI | Management | Strategy | Funds · With over 26 years of experience in finance, accounting, and taxation, I am a seasoned Chartered Accountant and senior finance executive who leads the finance function at two dynamic and innovative companies: MoXey, a Fintech start-up that offers digital payment solutions, and TruKKer, the largest technology-enabled trucking network in the Middle East.",
-        "url": "https://www.linkedin.com/in/ca-aniljain/",
-        "enriched_company": "MoXey"
+        "name": "Mujhahid Anwari",
+        "title": "Mujhahid Anwari - Angel Investor | Property & Real Estate",
+        "snippet": "Dubai , United Arab Emirates As an angel investor , I work with early-stage startups across the property, fintech, and emerging tech sectors, with a particular focus on real estate innovation. I provide capital, strategic planning, and hands-on advisory support to help founders navigate growth and scale effectively. Chief Investment Officer • Angel Investor • Senior Advisor • Oxford, Cambridge, Harvard & Brookings Alumnus · David is an entrepreneurial, energetic, resourceful, and results-oriented investment leader and strategic advisor with 20+ years of experience across private and public markets. A proven fund manager, angel investor , client portfolio manager, and business builder",
+        "url": "https://ae.linkedin.com/in/mujhahid-anwari-5507a22b8",
+        "enriched_company": ""
     },
     {
         "name": "Rahim Sajan",
