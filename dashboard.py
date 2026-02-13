@@ -464,7 +464,7 @@ def run_dashboard():
             st.session_state.demo_batch_index += 1
             
             # First Pass Container (simulated)
-            first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
+            first_pass_status = st.status("Running Public Lead Discovery...", expanded=True)
             with first_pass_status:
                 st.write("Searching LinkedIn profiles...")
                 progress_bar = st.progress(0)
@@ -508,7 +508,7 @@ def run_dashboard():
             # Second Pass Container (simulated)
             temp_second_pass = []
             if temp_first_pass:
-                second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
+                second_pass_status = st.status("Running Automated Verification...", expanded=True)
                 with second_pass_status:
                     st.write("Verifying investor credentials...")
                     verify_progress = st.progress(0)
