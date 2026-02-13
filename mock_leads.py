@@ -9,80 +9,70 @@ MOCK_LEADS_BATCH_1 = [
         "title": "David Wickham - Chief Investment Officer • Angel Investor | LinkedIn",
         "snippet": "Chief Investment Officer • Angel Investor • Senior Advisor • Oxford, Cambridge, Harvard & Brookings Alumnus · David is an entrepreneurial, energetic, resourceful, and results-oriented investment leader and strategic advisor with 20+ years of experience across private and public markets. A proven fund manager, angel investor, client portfolio manager, and business builder",
         "url": "https://ae.linkedin.com/in/davidwickham",
-        "enriched_company": "",
-        "fixed_score": 8.8
+        "enriched_company": ""
     },
     {
         "name": "Ajay Sajnani",
         "title": "Ajay Sajnani - CEO @ AJS Capital Real Estate Group | 20+ Years | LinkedIn",
         "snippet": "CEO @ AJS Capital Real Estate Group | 20+ Years Building, Designing & Investing in Luxury Real Estate | Global Real Estate Investment Advisor | Interior Fit-Out Expert | Angel Investor | Dubai & Europe · My real estate journey began not by selling properties but by building them. It started over 20 years ago: — Cofounder @ Interiors R Us My first stint: an interior design",
         "url": "https://ae.linkedin.com/in/ajay-sajnani",
-        "enriched_company": "AJS Capital Real Estate Group",
-        "fixed_score": 9.0
+        "enriched_company": "AJS Capital Real Estate Group"
     },
     {
         "name": "Craig Ambrose",
         "title": "Craig Ambrose - CEO, Angel Investor, Advisor, NED | LinkedIn",
         "snippet": "CEO, Angel Investor, Advisor, NED, Board Member · Visionary Leader | Entrepreneur | BPO and Corporate Function Transformations Pioneer 🚀 Executive with experience in start-up, turnaround and high growth business environments. Deep multi-cultural experience working in Europe, Middle East, North Africa and Asia across diverse industries. · Experience: Wusoom Holding United Arab Emirates Listed on the NYSE, Cooper was a diversified global manufacturer of electrical components and products with annual global revenues of $5 billion (before acquisition by Eaton in 2012) Responsible for the strategic direction and deployment of the HR function across the MENA region.",
         "url": "https://ae.linkedin.com/in/craigambrose99",
-        "enriched_company": "Wusoom Holding",
-        "fixed_score": 9.1
+        "enriched_company": "Wusoom Holding"
     },
     {
         "name": "Victor Newman",
         "title": "Victor Newman - Angel Investor - Red Sea Trading | LinkedIn",
         "snippet": "Angel Investor at Red Sea Trading · Experience: Red Sea Trading · Education: Université Paris-Sorbonne · Location: United Arab Emirates · 1 colleague on LinkedIn.",
         "url": "https://ae.linkedin.com/in/victor-newman-2b2614103",
-        "enriched_company": "Red Sea Trading",
-        "fixed_score": 6.5
+        "enriched_company": "Red Sea Trading"
     },
     {
         "name": "Zohaan Ahmed",
         "title": "Zohaan Ahmed - Serial Entrepreneur & Angel Investor | CEO | LinkedIn",
         "snippet": "I'm Zohaan Ahmed, a seasoned entrepreneur and angel investor passionate about helping businesses scale seamlessly across borders. --- Serial Entrepreneur & Angel Investor | CEO, 7th Sky Group | Global Business Expansion Expert (US & UAE) | Startup Growth & IT Hiring Solutions · 🌍 Zohaan Ahmed | Entrepreneur",
         "url": "https://www.linkedin.com/in/zohaan-ahmed-5b0363b3",
-        "enriched_company": "7th Sky Group",
-        "fixed_score": 5.7
+        "enriched_company": "7th Sky Group"
     },
     {
         "name": "Pavel Fedorov",
         "title": "Pavel Fedorov - Serial entrepreneur, Web3, Angel investor | LinkedIn",
         "snippet": "Serial entrepreneur, Web3, Angel investor · My experience of investments for more than 15 years gives me the confidence that I can make the best investment products for any type of investor - from HNWI to any institutional (including asset management/pension funds and VC/PE funds), and my",
         "url": "https://www.linkedin.com/in/pavel-fedorov-3a323814b/",
-        "enriched_company": "",
-        "fixed_score": 4.2
+        "enriched_company": ""
     },
     {
         "name": "Matt Henderson",
         "title": "Matt Henderson - Angel Investor & Founder | LinkedIn",
         "snippet": "Angel Investor & Founder · Experience: Good Daily · Education: Harvard Business School Online · Location: United States · 500+ connections on LinkedIn.",
         "url": "https://www.linkedin.com/in/juhaszhenderson",
-        "enriched_company": "Good Daily",
-        "fixed_score": 4.6
+        "enriched_company": "Good Daily"
     },
     {
         "name": "Poonam Sharma",
         "title": "Poonam Sharma - Director of Manufacturing• Entrepreneur | LinkedIn",
         "snippet": "Director of Manufacturing• Entrepreneur • Internet of Things • Angel Investor · MANUFACTURING EXPERT Poonam is a seasoned manufacturing expert committed to turning impactful ideas into reality and driving humanity forward into the future.",
         "url": "https://in.linkedin.com/in/poonamsh17",
-        "enriched_company": "",
-        "fixed_score": 3.8
+        "enriched_company": ""
     },
     {
         "name": "CA Anil Jain",
         "title": "CA Anil Jain - Fractional CFO | Chartered Accountant | Start-Ups | Angel Investor | LinkedIn",
         "snippet": "June 7, 2025 - Fractional CFO | Chartered Accountant | Start-Ups | Angel Investor | Realtor | FMCG | Retail | Business setup | Logistics | Taxation | Fintech | HR | Tech | Automation | Agentic AI | Management | Strategy | Funds · With over 26 years of experience in finance, accounting, and taxation, I am a seasoned Chartered Accountant and senior finance executive who leads the finance function at two dynamic and innovative companies: MoXey, a Fintech start-up that offers digital payment solutions, and TruKKer, the largest technology-enabled trucking network in the Middle East.",
         "url": "https://www.linkedin.com/in/ca-aniljain/",
-        "enriched_company": "MoXey",
-        "fixed_score": 5.4
+        "enriched_company": "MoXey"
     },
     {
         "name": "Rahim Sajan",
         "title": "Rahim Sajan - Entrepreneur, Engineer, Angel & Market Investor | LinkedIn",
         "snippet": "Angel Investor; Finance and Engineering Professional who has invested / consulted to a variety of businesses including financial, engineering, power and education.",
         "url": "https://ae.linkedin.com/in/rahim-sajan-51b0a214",
-        "enriched_company": "",
-        "fixed_score": 5.0
+        "enriched_company": ""
     }
 ]
 
@@ -93,47 +83,41 @@ MOCK_LEADS_BATCH_2 = [
         "title": "Mo Aziz - Cofounder at Pluto, YC Alum | Angel Investor | LinkedIn",
         "snippet": "Cofounder at Pluto, YC Alum | Angel Investor · As the Co-Founder and CEO of Pluto, I am on a mission to empower financial transformation for enterprises in the UAE and beyond. Pluto is the leading spend management platform that automates and simplifies expenses, smart corporate cards, and end-to-end account payables. With Pluto, financial controllers and CFOs can manage and enforce",
         "url": "https://ae.linkedin.com/in/moaziz-1",
-        "enriched_company": "Pluto",
-        "fixed_score": 9.0
+        "enriched_company": "Pluto"
     },
     {
         "name": "Krishna Subramanian",
         "title": "Krishna Subramanian - CFO/Turnaround Agent/Board Member/Angel Investor | LinkedIn",
         "snippet": "CFO/Turnaround Agent/Board Member/ Angel Investor · Board member and CFO - Al Yousuf Group Advisor - Cleanco Board member - Hapbee Technologies Board member of Prudential Consulting Services, UAE Director - Avinya IT Solutions Director - Primevest Realty Extensive experience in finance over a period of 30 years with specific focus on International fund raise, Corporate Governance",
         "url": "https://ae.linkedin.com/in/krishnasubramanian1",
-        "enriched_company": "Al Yousuf Group",
-        "fixed_score": 8.9
+        "enriched_company": "Al Yousuf Group"
     },
     {
         "name": "Hashem Montasser",
         "title": "Hashem Montasser - Founder & CEO of The Lighthouse Group | LinkedIn",
         "snippet": "Angel Investor | Ex-Investment Banker · Hashem Montasser is the Founder/CEO of the Lighthouse Group, a GCC-based hospitality group with restaurants in Dubai, Abu Dhabi and Riyadh. A concept store, monthly podcast hosted by Hashem and an events activation space also sit at the heart of The Lighthouse's experiential ethos. The Group also",
         "url": "https://ae.linkedin.com/in/hashem-montasser",
-        "enriched_company": "The Lighthouse Group",
-        "fixed_score": 8.6
+        "enriched_company": "The Lighthouse Group"
     },
     {
         "name": "Arnab Chatterjee",
         "title": "Arnab Chatterjee - Investment Banker and Angel Investor | LinkedIn",
         "snippet": "Investment Banker and Angel Investor · I have over 22 years of M&A advisory experience in the emerging markets. Currently I am providing advisory and consulting services to companies looking at inorganic and organic expansion and helping early stage companies in the technology and environmental space to come to market. In the past I have led a team of eight M&A bankers in",
         "url": "https://ae.linkedin.com/in/arnab-chatterjee",
-        "enriched_company": "",
-        "fixed_score": 8.3
+        "enriched_company": ""
     },
     {
         "name": "Timofei Andriianov",
         "title": "Timofei Andriianov - HR-Tech Angel Investor | AI Enthusiast | LinkedIn",
         "snippet": "Timofei Andriianov HR-Tech Angel Investor | AI Enthusiast | Investment Syndicate Leader Dubai, United Arab Emirates 4K followers 500+ connections HR-Tech Angel Investor | AI Enthusiast | Investment Syndicate Leader · I'm helping HR-tech Founders raise funds for early-stage startups. My investment focus includes late pre-seed, early seed, and seed, with investments ranging up to $1 million. With a network of more than 500 business angels I will organize an investment syndicate that will help you: • attract more funds to your",
         "url": "https://ae.linkedin.com/in/timofei-andriianov/en",
-        "enriched_company": "",
-        "fixed_score": 7.2
+        "enriched_company": ""
     },
     {
         "name": "Traci Little-AlShaali",
         "title": "Traci Little-AlShaali - Entrepreneur, Interlocutor, Strategist, Angel Investor | LinkedIn",
         "snippet": "Entrepreneur, Interlocutor, Strategist, Angel Investor, Wife, and Mother. Helping Tech, Education, and Life Science companies navigate Global Markets. Passion: creating a global community of women investors and founders. UAE",
         "url": "https://ae.linkedin.com/in/traci-little-alshaali-811956140",
-        "enriched_company": "",
-        "fixed_score": 6.6
+        "enriched_company": ""
     }
 ]
