@@ -7,6 +7,11 @@ import time
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords, seniority_keywords)
 import second_pass
 
+# Check if demo mode is enabled (controlled from sidebar)
+DEMO_MODE = st.session_state.get("demo_mode", False)
+
+if DEMO_MODE:
+    from mock_leads import MOCK_LEADS_BATCH_1, MOCK_LEADS_BATCH_2
 
 def run_dashboard():
     """
@@ -29,13 +34,13 @@ def run_dashboard():
                 
     /* Metric cards styling */
     [data-testid="stMetricValue"] {
-        font-size: 2rem;
+        font-size: 1.75rem;
         font-weight: 600;
         color: #1F2937;
     }
-    
+
     [data-testid="stMetricLabel"] {
-        font-size: 0.95rem;
+        font-size: 0.85rem;
         font-weight: 500;
         color: #6B7280;
         text-transform: uppercase;
@@ -197,6 +202,36 @@ def run_dashboard():
         margin-bottom: 20px !important;
     }
     
+    /* CSS-only progress bar inside card */
+    .progress-container {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #E5E7EB;
+    }
+
+    .progress-label {
+        font-size: 0.85rem;
+        color: #6B7280;
+        margin-bottom: 6px;
+        font-weight: 500;
+    }
+
+    .progress-bar-bg {
+        width: 100%;
+        height: 8px;
+        background-color: #E5E7EB;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3B82F6, #2563EB);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+/* Checkbox styling */            
     /* Checkbox styling */
     .stCheckbox {
         font-size: 1rem;
@@ -213,8 +248,18 @@ def run_dashboard():
     """, unsafe_allow_html=True)
     
     # ==================== HEADER ====================
-    st.markdown("<h1 style='text-align: center;'> TekhLeads UAE Investor Discovery Platform</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: #6B7280;'>AI-Powered Lead Intelligence for High-Value Investors</h3>", unsafe_allow_html=True)
+    st.markdown(
+        "<h1 style='text-align: center; font-size: 2.25rem; margin-bottom: 0.5rem;'>"
+        "TekhLeads UAE Investor Discovery Platform"
+        "</h1>", 
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<h3 style='text-align: center; color: #6B7280; font-size: 1.1rem; font-weight: 400; margin-top: 0;'>"
+        "AI-Driven Lead Intelligence for High-Value Investors"
+        "</h3>", 
+        unsafe_allow_html=True
+    )    
     st.markdown("---")
     
     # ==================== SESSION STATE INITIALIZATION ====================
@@ -226,6 +271,8 @@ def run_dashboard():
         st.session_state.trigger_discovery = False
     if "first_discovery_done" not in st.session_state:
         st.session_state.first_discovery_done = False
+    if "demo_batch_index" not in st.session_state:
+        st.session_state.demo_batch_index = 0  # Track which batch to use (0=batch1, 1=batch2)    
     
     # ==================== HELPER FUNCTIONS ====================
     blocked_urls = [
@@ -300,39 +347,57 @@ def run_dashboard():
             return keyword.title()
     
     # ==================== METRICS SECTION ====================
-    col1, col2, col3 = st.columns(3)
-    
+    col1, col2, col3, col4 = st.columns(4)
+
     total_discovered = len(st.session_state.dashboard_results)
-    
+
     # Fix: Count unique verified names, not total verification records
     verified_names = set()
     if st.session_state.dashboard_verified:
         df_verified = pd.DataFrame(st.session_state.dashboard_verified)
         verified_names = set(df_verified["Name"].unique())
     verified_count = len(verified_names)
-    
+
+    # UAE-Connected: Count leads with UAE keywords
+    uae_connected_count = sum(
+        1 for r in st.session_state.dashboard_results 
+        if r.get("Geo Keywords") and len(r.get("Geo Keywords", [])) > 0
+    )
+
+    # High-Value: Count leads with score >= 7
+    high_value_count = sum(
+        1 for r in st.session_state.dashboard_results 
+        if r.get("Score", 0) >= 7.0
+    )
+
     green_list_count = sum(1 for r in st.session_state.dashboard_results 
-                           if r.get("Final Verdict") == "Green List")
-    
+                        if r.get("Final Verdict") == "Green List")
+
     with col1:
         st.metric(
             label="Total Discovered",
             value=total_discovered,
             delta=None
         )
-    
+
     with col2:
         st.metric(
             label="Verified Investors",
             value=verified_count,
             delta=None
         )
-    
+
     with col3:
-        green_pct = (green_list_count / total_discovered * 100) if total_discovered > 0 else 0
         st.metric(
-            label="Green List %",
-            value=f"{green_pct:.0f}%",
+            label="UAE-Connected",
+            value=uae_connected_count,
+            delta=None
+        )
+
+    with col4:
+        st.metric(
+            label="High-Value Leads",
+            value=high_value_count,
             delta=None
         )
     
@@ -343,7 +408,7 @@ def run_dashboard():
         # Show initial discovery button
         col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
         with col_btn2:
-            discover_button = st.button("🚀 Discover UAE Investors", use_container_width=True, type="primary")
+            discover_button = st.button("Discover UAE Investors", use_container_width=True, type="primary")
         
         should_discover = discover_button
     else:
@@ -351,7 +416,7 @@ def run_dashboard():
         col_info1, col_info2, col_info3 = st.columns([1, 2, 1])
         with col_info2:
             st.info("✓ Search active. Scroll down and use 'Discover More' to find additional leads.")
-            if st.button("🔄 Reset Search", use_container_width=True, key="reset_search"):
+            if st.button("Reset Search", use_container_width=True, key="reset_search"):
                 st.session_state.first_discovery_done = False
                 st.session_state.dashboard_results = []
                 st.session_state.dashboard_verified = []
@@ -370,196 +435,344 @@ def run_dashboard():
     if should_discover:
         # Set flag that first discovery has been completed
         st.session_state.first_discovery_done = True
-        # Fixed query for UAE angel investors
-        query = '"angel investor" UAE site:linkedin.com/in'
-        max_results = 5
-        
-        # First Pass Container
-        first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
-        with first_pass_status:
-            st.write("Searching LinkedIn profiles...")
-            progress_bar = st.progress(0)
-            current_name_display = st.empty()  # For clearing previous names
+        # ==================== DEMO MODE BRANCH ====================
+        if DEMO_MODE:
+            # Use mock data instead of DDGS
+            query = '"angel investor" UAE site:linkedin.com/in'
             
-            temp_first_pass = []
+            # Select which batch to use
+            if st.session_state.demo_batch_index == 0:
+                mock_leads_to_use = MOCK_LEADS_BATCH_1
+            else:
+                mock_leads_to_use = MOCK_LEADS_BATCH_2
             
-            with DDGS(timeout=10) as ddgs:
-                results_list = list(ddgs.text(query, max_results=max_results, backend="lite"))
-                total = len(results_list)
+            # Increment batch index for next time
+            st.session_state.demo_batch_index += 1
+            
+            # First Pass Container (simulated)
+            first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
+            with first_pass_status:
+                st.write("Searching LinkedIn profiles...")
+                progress_bar = st.progress(0)
+                current_name_display = st.empty()
                 
-                for idx, r in enumerate(results_list):
-                    url = r.get("href", "")
-                    if not url:
-                        continue
+                temp_first_pass = []
+                
+                # Simulate delay
+                time.sleep(2)
+                
+                total = len(mock_leads_to_use)
+                for idx, mock_lead in enumerate(mock_leads_to_use):
+                    # Process through first_pass scoring
+                    combined = f"{mock_lead['title']} {mock_lead['snippet']}"
+                    score, conf, breakdown, enriched_company = score_text(combined, query, mock_lead["url"])
                     
-                    if any(bad in normalize_url(url) for bad in blocked_urls):
-                        continue
+                    # Use mock enriched company if provided
+                    if mock_lead.get("enriched_company"):
+                        enriched_company = mock_lead["enriched_company"]
                     
-                    title = soft_truncate_ellipsis(r.get("title", ""))
-                    snippet = soft_truncate_ellipsis(r.get("body", ""))
+                    name = mock_lead["name"]
                     
-                    if " | LinkedIn" in title:
-                        match = re.search(r'(\s*[-–—]?\s*\|\s*LinkedIn)', title)
-                        if match:
-                            cut_idx = match.start()
-                            title = title[:cut_idx + len(match.group(0))].strip()
-                        else:
-                            parts = title.split(" | LinkedIn")
-                            title = parts[0].strip() + " | LinkedIn"
+                    temp_first_pass.append({
+                        "Name": name,
+                        "Title": mock_lead["title"],
+                        "Snippet": mock_lead["snippet"],
+                        "URL": mock_lead["url"],
+                        "Score": score,
+                        "Confidence": conf,
+                        "Signals": " | ".join(breakdown),
+                        "Enriched Company": enriched_company
+                    })
                     
-                    if is_duplicate_url(url, st.session_state.dashboard_results, title, snippet):
-                        continue
-                    
-                    combined = f"{title} {snippet}"
-                    score, conf, breakdown, enriched_company = score_text(combined, query, url)
-                    name = extract_name(title)
-                    
-                    if not is_valid_person_name(name):
-                        continue
-                    
-                    existing_idx = find_existing_person(url, st.session_state.dashboard_results)
-                    if existing_idx is not None:
-                        existing = st.session_state.dashboard_results[existing_idx]
-                        # Safely update existing entry with .get() methods
-                        if "Snippet" in existing:
-                            existing["Snippet"] += "\n---\n" + snippet
-                        existing["Score"] = max(existing.get("Score", 0), score)
-                        old_signals = set(existing.get("Signals", "").split(" | "))
-                        new_signals = set(breakdown)
-                        existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
-                        if conf == "High":
-                            existing["Confidence"] = "High"
-                        elif conf == "Medium" and existing.get("Confidence") == "Low":
-                            existing["Confidence"] = "Medium"
-                    else:
-                        temp_first_pass.append({
-                            "Name": name,
-                            "Title": title,
-                            "Snippet": snippet,
-                            "URL": url,
-                            "Score": score,
-                            "Confidence": conf,
-                            "Signals": " | ".join(breakdown),
-                            "Enriched Company": enriched_company
-                        })
-                        # Update the display with current name (clears previous)
-                        current_name_display.write(f"✓ Found: **{name}**")
-                    
+                    # Update display (clears previous)
+                    current_name_display.write(f"✓ Found: **{name}**")
                     progress_bar.progress((idx + 1) / total)
                     time.sleep(0.1)
-            
-            first_pass_status.update(label="First Pass Complete", state="complete")
-        
-        # Second Pass Container
-        temp_second_pass = []  # Initialize here to prevent NameError if temp_first_pass is empty
-        if temp_first_pass:
-            second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
-            with second_pass_status:
-                st.write("Verifying investor credentials...")
-                verify_progress = st.progress(0)
-                current_verify_display = st.empty()  # For clearing previous names
                 
-                temp_second_pass = []  # Reset for this verification run
-                
-                for idx, person in enumerate(temp_first_pass):
-                    name = person["Name"]
-                    enriched_company = person.get("Enriched Company", "")
-                    snippet = person.get("Snippet", "")
-                    
-                    # Update the display with current name (clears previous)
-                    current_verify_display.write(f"Verifying: **{name}**")
-                    
-                    anchors = second_pass.extract_anchors(snippet)
-                    queries = second_pass.build_second_pass_queries(name, anchors, enriched_company)
-                    
-                    state = {
-                        "identity_confirmed": False,
-                        "geo_hits": 0,
-                        "linkedin_hits": 0,
-                        "domain_hits": set(),
-                        "expected_name": name
-                    }
-                    
-                    with DDGS(timeout=10) as ddgs:
-                        for q in queries[:2]:
-                            try:
-                                verification_results = list(ddgs.text(q, max_results=3, backend="lite"))
-                                
-                                for vr in verification_results:
-                                    url = vr.get("href", "")
-                                    if not url:
-                                        continue
-                                    
-                                    text = f"{vr.get('title', '')} {vr.get('body', '')}"
-                                    score2, breakdown2, confirmed = second_pass.score_second_pass(text, url, state)
-                                    
-                                    if score2 > 0:
-                                        temp_second_pass.append({
-                                            "Name": name,
-                                            "Query Used": q,
-                                            "Snippet": text,
-                                            "Second Pass Score": score2,
-                                            "Score Breakdown": " | ".join(breakdown2),
-                                            "Source URL": url
-                                        })
-                                
-                                time.sleep(0.5)
-                            except Exception as e:
-                                continue
-                    
-                    verify_progress.progress((idx + 1) / len(temp_first_pass))
-                    time.sleep(0.1)
-                
-                second_pass_status.update(label="Verification Complete", state="complete")
-        
-        # Consolidation
-        st.session_state.dashboard_results.extend(temp_first_pass)
-        st.session_state.dashboard_verified.extend(temp_second_pass)
-        
-        # Create consolidated results
-        consolidated = []
-        df_second = pd.DataFrame(st.session_state.dashboard_verified)
-        
-        for person in st.session_state.dashboard_results:
-            name = person["Name"]
-            first_pass_score = person["Score"]
-            enriched_company = person.get("Enriched Company", "")
-            url = person.get("URL", "")
-            signals = person.get("Signals", "")
-            title = person.get("Title", "") # Added to preserve metadata
-            snippet = person.get("Snippet", "") # Added to preserve metadata
+                first_pass_status.update(label="First Pass Complete", state="complete")
             
-            # Extract keywords
-            identity_kws = extract_keywords_from_signals(signals, identity_keywords)
-            geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
-            seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)
-            
-            # Check if verified
-            if not df_second.empty and name in df_second["Name"].values:
-                person_verified = df_second[df_second["Name"] == name]
-                second_pass_total = min(person_verified["Second Pass Score"].sum(), 10.0)
-                final_score = (first_pass_score + second_pass_total) / 2
-            else:
-                second_pass_total = 0.0
-                final_score = first_pass_score / 2
-            
-            # Determine verdict
-            verdict = "Green List" if final_score >= 5.0 else "Red List"
-            
-            consolidated.append({
+            # Second Pass Container (simulated)
+            temp_second_pass = []
+            if temp_first_pass:
+                second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
+                with second_pass_status:
+                    st.write("Verifying investor credentials...")
+                    verify_progress = st.progress(0)
+                    current_verify_display = st.empty()
+                    
+                    for idx, person in enumerate(temp_first_pass):
+                        name = person["Name"]
+                        
+                        # Update display
+                        current_verify_display.write(f"Verifying: **{name}**")
+                        
+                        # Simulate verification delay (1.5 seconds per name)
+                        time.sleep(1.5)
+                        
+                        # Simulate second pass scoring (simplified for demo)
+                        temp_second_pass.append({
                             "Name": name,
-                            "Company": enriched_company,
-                            "Identity Keywords": identity_kws,
-                            "Geo Keywords": geo_kws,
-                            "Seniority Keywords": seniority_kws,
-                            "Score": final_score,
-                            "Final Verdict": verdict,
-                            "URL": url,
-                            "Title": person.get("Title", ""),
-                            "Snippet": person.get("Snippet", ""),
-                            "Signals": signals,
-                            "Confidence": person.get("Confidence", "Low")
+                            "Query Used": f'"{name}" UAE investor',
+                            "Snippet": person["Snippet"][:200],
+                            "Second Pass Score": min(person["Score"] * 0.8, 10.0),
+                            "Score Breakdown": "Simulated verification",
+                            "Source URL": person["URL"]
                         })
+                        
+                        verify_progress.progress((idx + 1) / len(temp_first_pass))
+                    
+                    second_pass_status.update(label="Verification Complete", state="complete")
+            
+            # Consolidation (same as live)
+            st.session_state.dashboard_results.extend(temp_first_pass)
+            st.session_state.dashboard_verified.extend(temp_second_pass)
+            
+            # Create consolidated results
+            consolidated = []
+            df_second = pd.DataFrame(st.session_state.dashboard_verified)
+            
+            for person in st.session_state.dashboard_results:
+                name = person["Name"]
+                first_pass_score = person["Score"]
+                enriched_company = person.get("Enriched Company", "")
+                url = person.get("URL", "")
+                signals = person.get("Signals", "")
+                title = person.get("Title", "")
+                snippet = person.get("Snippet", "")
+                
+                # Extract keywords
+                identity_kws = extract_keywords_from_signals(signals, identity_keywords)
+                geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
+                seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)
+                
+                # Check if verified
+                if not df_second.empty and name in df_second["Name"].values:
+                    person_verified = df_second[df_second["Name"] == name]
+                    second_pass_total = min(person_verified["Second Pass Score"].sum(), 10.0)
+                    final_score = (first_pass_score + second_pass_total) / 2
+                else:
+                    second_pass_total = 0.0
+                    final_score = first_pass_score / 2
+                
+                # Determine verdict
+                verdict = "Green List" if final_score >= 5.0 else "Red List"
+                
+                consolidated.append({
+                    "Name": name,
+                    "Company": enriched_company,
+                    "Identity Keywords": identity_kws,
+                    "Geo Keywords": geo_kws,
+                    "Seniority Keywords": seniority_kws,
+                    "Score": final_score,
+                    "Final Verdict": verdict,
+                    "URL": url,
+                    "Title": title,
+                    "Snippet": snippet,
+                    "Signals": signals,
+                    "Confidence": person.get("Confidence", "Low")
+                })
+            
+            # Update results
+            st.session_state.dashboard_results = []
+            for item in consolidated:
+                st.session_state.dashboard_results.append(item)
+            
+            st.success("Discovery Complete!")
+            time.sleep(1)
+            st.rerun()
+        
+        # ==================== LIVE MODE (DDGS) BRANCH ====================
+        else:
+            # Fixed query for UAE angel investors
+            query = '"angel investor" UAE site:linkedin.com/in'
+            max_results = 5
+        
+            # First Pass Container
+            first_pass_status = st.status("Running First Pass Discovery...", expanded=True)
+            with first_pass_status:
+                st.write("Searching LinkedIn profiles...")
+                progress_bar = st.progress(0)
+                current_name_display = st.empty()  # For clearing previous names
+                
+                temp_first_pass = []
+                
+                with DDGS(timeout=10) as ddgs:
+                    results_list = list(ddgs.text(query, max_results=max_results, backend="lite"))
+                    total = len(results_list)
+                    
+                    for idx, r in enumerate(results_list):
+                        url = r.get("href", "")
+                        if not url:
+                            continue
+                        
+                        if any(bad in normalize_url(url) for bad in blocked_urls):
+                            continue
+                        
+                        title = soft_truncate_ellipsis(r.get("title", ""))
+                        snippet = soft_truncate_ellipsis(r.get("body", ""))
+                        
+                        if " | LinkedIn" in title:
+                            match = re.search(r'(\s*[-–—]?\s*\|\s*LinkedIn)', title)
+                            if match:
+                                cut_idx = match.start()
+                                title = title[:cut_idx + len(match.group(0))].strip()
+                            else:
+                                parts = title.split(" | LinkedIn")
+                                title = parts[0].strip() + " | LinkedIn"
+                        
+                        if is_duplicate_url(url, st.session_state.dashboard_results, title, snippet):
+                            continue
+                        
+                        combined = f"{title} {snippet}"
+                        score, conf, breakdown, enriched_company = score_text(combined, query, url)
+                        name = extract_name(title)
+                        
+                        if not is_valid_person_name(name):
+                            continue
+                        
+                        existing_idx = find_existing_person(url, st.session_state.dashboard_results)
+                        if existing_idx is not None:
+                            existing = st.session_state.dashboard_results[existing_idx]
+                            # Safely update existing entry with .get() methods
+                            if "Snippet" in existing:
+                                existing["Snippet"] += "\n---\n" + snippet
+                            existing["Score"] = max(existing.get("Score", 0), score)
+                            old_signals = set(existing.get("Signals", "").split(" | "))
+                            new_signals = set(breakdown)
+                            existing["Signals"] = " | ".join(sorted(old_signals | new_signals))
+                            if conf == "High":
+                                existing["Confidence"] = "High"
+                            elif conf == "Medium" and existing.get("Confidence") == "Low":
+                                existing["Confidence"] = "Medium"
+                        else:
+                            temp_first_pass.append({
+                                "Name": name,
+                                "Title": title,
+                                "Snippet": snippet,
+                                "URL": url,
+                                "Score": score,
+                                "Confidence": conf,
+                                "Signals": " | ".join(breakdown),
+                                "Enriched Company": enriched_company
+                            })
+                            # Update the display with current name (clears previous)
+                            current_name_display.write(f"✓ Found: **{name}**")
+                        
+                        progress_bar.progress((idx + 1) / total)
+                        time.sleep(0.1)
+                
+                first_pass_status.update(label="First Pass Complete", state="complete")
+            
+            # Second Pass Container
+            temp_second_pass = []  # Initialize here to prevent NameError if temp_first_pass is empty
+            if temp_first_pass:
+                second_pass_status = st.status("Running Second Pass Verification...", expanded=True)
+                with second_pass_status:
+                    st.write("Verifying investor credentials. Please wait...")
+                    verify_progress = st.progress(0)
+                    current_verify_display = st.empty()  # For clearing previous names
+                    
+                    temp_second_pass = []  # Reset for this verification run
+                    
+                    for idx, person in enumerate(temp_first_pass):
+                        name = person["Name"]
+                        enriched_company = person.get("Enriched Company", "")
+                        snippet = person.get("Snippet", "")
+                        
+                        # Update the display with current name (clears previous)
+                        current_verify_display.write(f"Verifying: **{name}**")
+                        
+                        anchors = second_pass.extract_anchors(snippet)
+                        queries = second_pass.build_second_pass_queries(name, anchors, enriched_company)
+                        
+                        state = {
+                            "identity_confirmed": False,
+                            "geo_hits": 0,
+                            "linkedin_hits": 0,
+                            "domain_hits": set(),
+                            "expected_name": name
+                        }
+                        
+                        with DDGS(timeout=10) as ddgs:
+                            for q in queries[:2]:
+                                try:
+                                    verification_results = list(ddgs.text(q, max_results=3, backend="lite"))
+                                    
+                                    for vr in verification_results:
+                                        url = vr.get("href", "")
+                                        if not url:
+                                            continue
+                                        
+                                        text = f"{vr.get('title', '')} {vr.get('body', '')}"
+                                        score2, breakdown2, confirmed = second_pass.score_second_pass(text, url, state)
+                                        
+                                        if score2 > 0:
+                                            temp_second_pass.append({
+                                                "Name": name,
+                                                "Query Used": q,
+                                                "Snippet": text,
+                                                "Second Pass Score": score2,
+                                                "Score Breakdown": " | ".join(breakdown2),
+                                                "Source URL": url
+                                            })
+                                    
+                                    time.sleep(0.5)
+                                except Exception as e:
+                                    continue
+                        
+                        verify_progress.progress((idx + 1) / len(temp_first_pass))
+                        time.sleep(0.1)
+                    
+                    second_pass_status.update(label="Verification Complete", state="complete")
+            
+            # Consolidation
+            st.session_state.dashboard_results.extend(temp_first_pass)
+            st.session_state.dashboard_verified.extend(temp_second_pass)
+            
+            # Create consolidated results
+            consolidated = []
+            df_second = pd.DataFrame(st.session_state.dashboard_verified)
+            
+            for person in st.session_state.dashboard_results:
+                name = person["Name"]
+                first_pass_score = person["Score"]
+                enriched_company = person.get("Enriched Company", "")
+                url = person.get("URL", "")
+                signals = person.get("Signals", "")
+                title = person.get("Title", "") # Added to preserve metadata
+                snippet = person.get("Snippet", "") # Added to preserve metadata
+                
+                # Extract keywords
+                identity_kws = extract_keywords_from_signals(signals, identity_keywords)
+                geo_kws = extract_keywords_from_signals(signals, uae_keywords + mena_keywords)
+                seniority_kws = extract_keywords_from_signals(signals, seniority_keywords)
+                
+                # Check if verified
+                if not df_second.empty and name in df_second["Name"].values:
+                    person_verified = df_second[df_second["Name"] == name]
+                    second_pass_total = min(person_verified["Second Pass Score"].sum(), 10.0)
+                    final_score = (first_pass_score + second_pass_total) / 2
+                else:
+                    second_pass_total = 0.0
+                    final_score = first_pass_score / 2
+                
+                # Determine verdict
+                verdict = "Green List" if final_score >= 5.0 else "Red List"
+                
+                consolidated.append({
+                                "Name": name,
+                                "Company": enriched_company,
+                                "Identity Keywords": identity_kws,
+                                "Geo Keywords": geo_kws,
+                                "Seniority Keywords": seniority_kws,
+                                "Score": final_score,
+                                "Final Verdict": verdict,
+                                "URL": url,
+                                "Title": person.get("Title", ""),
+                                "Snippet": person.get("Snippet", ""),
+                                "Signals": signals,
+                                "Confidence": person.get("Confidence", "Low")
+                            })
         
         # Update results in session state
         st.session_state.dashboard_results = []
@@ -580,11 +793,11 @@ def run_dashboard():
         if show_green_only:
             display_results = [r for r in display_results if r.get("Final Verdict") == "Green List"]
         
-        # Sort: enriched companies first
-        display_results = sorted(
-            display_results,
-            key=lambda x: (x.get("Company", "") == "", -x.get("Score", 0))
-        )
+        # Sort: enriched companies first. Maybe use later
+        #display_results = sorted(
+        #    display_results,
+        #    key=lambda x: (x.get("Company", "") == "", -x.get("Score", 0))
+        #)
         
         # ==================== DISPLAY CARDS ====================
         st.markdown("### Investor Leads")
@@ -625,14 +838,21 @@ def run_dashboard():
                         <span class="badge {verdict_class}">{verdict}</span>
                         <a href="{url}" target="_blank" class="linkedin-btn">View LinkedIn</a>
                     </div>
+
+                    <div class="progress-container">
+                        <div class="progress-label">AI Confidence: {score:.1f}/10</div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: {(score/10)*100}%"></div>
+                        </div>
+                    </div>
                 </div>
                 """
-                
+                                
                 st.html(card_html)
                 
                 # Progress column for AI Confidence
-                st.progress(score / 10, text=f"AI Confidence: {score:.1f}/10")
-                st.markdown("<br>", unsafe_allow_html=True)
+                #st.progress(score / 10, text=f"AI Confidence: {score:.1f}/10")
+                #st.markdown("<br>", unsafe_allow_html=True)
             
             # Second card in row (if exists)
             if i + 1 < len(display_results):
@@ -666,14 +886,21 @@ def run_dashboard():
                             <span class="badge {verdict_class}">{verdict}</span>
                             <a href="{url}" target="_blank" class="linkedin-btn">View LinkedIn</a>
                         </div>
+
+                        <div class="progress-container">
+                            <div class="progress-label">AI Confidence: {score:.1f}/10</div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width: {(score/10)*100}%"></div>
+                            </div>
+                        </div>
                     </div>
                     """
                     
                     st.html(card_html)
                     
                     # Progress column for AI Confidence
-                    st.progress(score / 10, text=f"AI Confidence: {score:.1f}/10")
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    #st.progress(score / 10, text=f"AI Confidence: {score:.1f}/10")
+                    #st.markdown("<br>", unsafe_allow_html=True)
         
         # ==================== DISCOVER MORE & DOWNLOAD CSV ====================
         st.markdown("---")
@@ -716,3 +943,12 @@ def run_dashboard():
                 mime="text/csv",
                 use_container_width=True
             )
+
+         # ==================== FOOTER ====================
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='text-align: center; color: #9CA3AF; font-size: 0.875rem; padding: 20px 0;'>"
+            "Leads Dashboard UAE"
+            "</p>", 
+            unsafe_allow_html=True
+        )   
