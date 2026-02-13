@@ -447,18 +447,9 @@ def run_dashboard():
         
         # ==================== DEMO MODE BRANCH ====================
         if demo_mode_active:
-            # Scroll to top of page when discovery starts
-            st.markdown(
-                """
-                <script>
-                    window.parent.document.querySelector('section.main').scrollTo(0, 0);
-                </script>
-                """,
-                unsafe_allow_html=True
-            )
             # Safety check - ensure mock leads are available
             if not MOCK_LEADS_AVAILABLE or not MOCK_LEADS_BATCH_1:
-                st.error("Mock leads not found! Make sure mock_leads.py is in the same folder.")
+                st.error("❌ Mock leads not found! Make sure mock_leads.py is in the same folder.")
                 st.stop()
             # Use mock data instead of DDGS
             query = '"angel investor" UAE site:linkedin.com/in'
@@ -529,10 +520,8 @@ def run_dashboard():
                         # Update display
                         current_verify_display.write(f"Verifying: **{name}**")
                         
-                        # Simulate verification delay (1.5 seconds per name)
-                        time.sleep(1.5)
                         # Simulate verification delay (random 1-3 seconds per name)
-                        delay = random.uniform(1.0, 3.0)
+                        delay = random.uniform(0.7, 2.1)
                         time.sleep(delay)
                         
                         # Simulate second pass scoring (simplified for demo)
@@ -557,7 +546,7 @@ def run_dashboard():
             consolidated = []
             df_second = pd.DataFrame(st.session_state.dashboard_verified)
             
-            for person in temp_first_pass:
+            for person in st.session_state.dashboard_results:
                 name = person["Name"]
                 first_pass_score = person["Score"]
                 enriched_company = person.get("Enriched Company", "")
@@ -599,6 +588,7 @@ def run_dashboard():
                 })
             
             # Update results
+            st.session_state.dashboard_results = []
             for item in consolidated:
                 st.session_state.dashboard_results.append(item)
             
