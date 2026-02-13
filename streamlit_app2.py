@@ -29,8 +29,27 @@ if "first_pass_results" not in st.session_state:
 if "second_pass_results" not in st.session_state:
     st.session_state.second_pass_results = []
 
+# ==================== DEMO MODE TOGGLE ====================
+if "demo_mode" not in st.session_state:
+    st.session_state.demo_mode = False
+
 st.sidebar.title("Sidebar")
-choice = st.sidebar.radio("Switch View:", ["Testing dashboard", "Dashboard", "AI model generation"])
+st.session_state.demo_mode = st.sidebar.checkbox(
+    "Demo Mode", 
+    value=st.session_state.demo_mode,
+    help="Use pre-loaded demo leads for presentations"
+)
+
+if st.session_state.demo_mode:
+    st.sidebar.success("Demo Active")
+else:
+    st.sidebar.info("Live Search")
+
+st.sidebar.markdown("---")
+st.sidebar.title("Navigation")    
+
+# SIDEBAR
+choice = st.sidebar.radio("Switch View:", ["Dashboard", "Testing dashboard", "AI model generation"])
 
 if choice == "Dashboard":
     run_dashboard()
