@@ -503,7 +503,7 @@ def run_dashboard():
                     progress_bar.progress((idx + 1) / total)
                     time.sleep(0.1)
                 
-                first_pass_status.update(label="First Pass Complete", state="complete")
+                first_pass_status.update(label="Public Lead Discovery Complete", state="complete")
             
             # Second Pass Container (simulated)
             temp_second_pass = []
@@ -536,7 +536,7 @@ def run_dashboard():
                         
                         verify_progress.progress((idx + 1) / len(temp_first_pass))
                     
-                    second_pass_status.update(label="Verification Complete", state="complete")
+                    second_pass_status.update(label="Automated Verification Complete", state="complete")
             
             # Consolidation (same as live)
             st.session_state.dashboard_results.extend(temp_first_pass)
