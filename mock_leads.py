@@ -26,11 +26,11 @@ MOCK_LEADS_BATCH_1 = [
         "enriched_company": "Wusoom Holding"
     },
     {
-        "name": "Victor Newman",
-        "title": "Victor Newman - Angel Investor - Red Sea Trading | LinkedIn",
-        "snippet": "Angel Investor at Red Sea Trading · Experience: Red Sea Trading · Education: Université Paris-Sorbonne · Location: United Arab Emirates · 1 colleague on LinkedIn.",
-        "url": "https://ae.linkedin.com/in/victor-newman-2b2614103",
-        "enriched_company": "Red Sea Trading"
+        "name": "Vikram Jain",
+        "title": "Vikram Jain - CTO & Fractional CPTO - LinkedIn",
+        "snippet": "CTO & Fractional CPTO | 20+ Years Helping Founders Turn Ideas into Scalable Products | Angel Investor | UAE · I have 20+ years of experience leading 400+ member teams and advising global clients",
+        "url": "https://www.linkedin.com/in/vikram-jain-galaxy/",
+        "enriched_company": ""
     },
     {
         "name": "Zohaan Ahmed",
@@ -54,10 +54,10 @@ MOCK_LEADS_BATCH_1 = [
         "enriched_company": "Good Daily"
     },
     {
-        "name": "Poonam Sharma",
-        "title": "Poonam Sharma - Entrepreneur | LinkedIn",
-        "snippet": "Entrepreneur • Internet of Things • Angel Investor · MANUFACTURING EXPERT Poonam is a seasoned manufacturing expert committed to turning impactful ideas into reality and driving humanity forward into the future.",
-        "url": "https://in.linkedin.com/in/poonamsh17",
+        "name": "Arnab Chatterjee",
+        "title": "Arnab Chatterjee - Investment Banker and Angel Investor | LinkedIn",
+        "snippet": "Investment Banker and Angel Investor · I have over 22 years of M&A advisory experience in the emerging markets. Currently I am providing advisory and consulting services to companies looking at inorganic and organic expansion and helping early stage companies in the technology and environmental space to come to market. In the past I have led a team of eight M&A bankers in",
+        "url": "https://ae.linkedin.com/in/arnab-chatterjee",
         "enriched_company": ""
     },
     {
@@ -100,10 +100,10 @@ MOCK_LEADS_BATCH_2 = [
         "enriched_company": "The Lighthouse Group"
     },
     {
-        "name": "Arnab Chatterjee",
-        "title": "Arnab Chatterjee - Investment Banker and Angel Investor | LinkedIn",
-        "snippet": "Investment Banker and Angel Investor · I have over 22 years of M&A advisory experience in the emerging markets. Currently I am providing advisory and consulting services to companies looking at inorganic and organic expansion and helping early stage companies in the technology and environmental space to come to market. In the past I have led a team of eight M&A bankers in",
-        "url": "https://ae.linkedin.com/in/arnab-chatterjee",
+        "name": "Poonam Sharma",
+        "title": "Poonam Sharma - Entrepreneur | LinkedIn",
+        "snippet": "Entrepreneur • Internet of Things • Angel Investor · MANUFACTURING EXPERT Poonam is a seasoned manufacturing expert committed to turning impactful ideas into reality and driving humanity forward into the future.",
+        "url": "https://in.linkedin.com/in/poonamsh17",
         "enriched_company": ""
     },
     {
