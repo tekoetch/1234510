@@ -7,11 +7,16 @@ import time
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords, seniority_keywords)
 import second_pass
 
-# Check if demo mode is enabled (controlled from sidebar)
-DEMO_MODE = st.session_state.get("demo_mode", False)
-
-if DEMO_MODE:
+# Demo mode will be checked inside the function
+# Import mock leads here so they're always available
+try:
     from mock_leads import MOCK_LEADS_BATCH_1, MOCK_LEADS_BATCH_2
+    MOCK_LEADS_AVAILABLE = True
+except ImportError:
+    MOCK_LEADS_AVAILABLE = False
+    MOCK_LEADS_BATCH_1 = []
+    MOCK_LEADS_BATCH_2 = []
+
 
 def run_dashboard():
     """
@@ -389,7 +394,7 @@ def run_dashboard():
 
     with col3:
         st.metric(
-            label="UAE-Connected",
+            label="Based in the UAE",
             value=uae_connected_count,
             delta=None
         )
@@ -435,8 +440,16 @@ def run_dashboard():
     if should_discover:
         # Set flag that first discovery has been completed
         st.session_state.first_discovery_done = True
+        
+        # Check demo mode from session state (inside function where it exists)
+        demo_mode_active = st.session_state.get("demo_mode", False)
+        
         # ==================== DEMO MODE BRANCH ====================
-        if DEMO_MODE:
+        if demo_mode_active:
+            # Safety check - ensure mock leads are available
+            if not MOCK_LEADS_AVAILABLE or not MOCK_LEADS_BATCH_1:
+                st.error("❌ Mock leads not found! Make sure mock_leads.py is in the same folder.")
+                st.stop()
             # Use mock data instead of DDGS
             query = '"angel investor" UAE site:linkedin.com/in'
             
@@ -485,7 +498,7 @@ def run_dashboard():
                     })
                     
                     # Update display (clears previous)
-                    current_name_display.write(f"✓ Found: **{name}**")
+                    current_name_display.write(f"Found: **{name}**")
                     progress_bar.progress((idx + 1) / total)
                     time.sleep(0.1)
                 
@@ -656,7 +669,7 @@ def run_dashboard():
                                 "Enriched Company": enriched_company
                             })
                             # Update the display with current name (clears previous)
-                            current_name_display.write(f"✓ Found: **{name}**")
+                            current_name_display.write(f"Found: **{name}**")
                         
                         progress_bar.progress((idx + 1) / total)
                         time.sleep(0.1)
