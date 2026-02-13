@@ -115,9 +115,9 @@ def run_dashboard():
     }
     
     .badge-seniority {
-        background-color: #FEF3C7;
+        background-color: #DBEAFE;
         color: #92400E;
-        border: 1px solid #FCD34D;
+        border: 1px solid #93C5FD;
     }
     
     .badge-green {
@@ -448,7 +448,7 @@ def run_dashboard():
         if demo_mode_active:
             # Safety check - ensure mock leads are available
             if not MOCK_LEADS_AVAILABLE or not MOCK_LEADS_BATCH_1:
-                st.error("❌ Mock leads not found! Make sure mock_leads.py is in the same folder.")
+                st.error("Mock leads not found! Make sure mock_leads.py is in the same folder.")
                 st.stop()
             # Use mock data instead of DDGS
             query = '"angel investor" UAE site:linkedin.com/in'
@@ -483,6 +483,10 @@ def run_dashboard():
                     # Use mock enriched company if provided
                     if mock_lead.get("enriched_company"):
                         enriched_company = mock_lead["enriched_company"]
+
+                    # Use fixed score if provided (for consistent demo)
+                    if mock_lead.get("fixed_score"):
+                        score = mock_lead["fixed_score"]
                     
                     name = mock_lead["name"]
                     
@@ -544,7 +548,7 @@ def run_dashboard():
             consolidated = []
             df_second = pd.DataFrame(st.session_state.dashboard_verified)
             
-            for person in st.session_state.dashboard_results:
+            for person in temp_first_pass:
                 name = person["Name"]
                 first_pass_score = person["Score"]
                 enriched_company = person.get("Enriched Company", "")
@@ -586,7 +590,6 @@ def run_dashboard():
                 })
             
             # Update results
-            st.session_state.dashboard_results = []
             for item in consolidated:
                 st.session_state.dashboard_results.append(item)
             
