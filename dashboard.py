@@ -421,7 +421,7 @@ def run_dashboard():
         # After first discovery, show info message with reset option
         col_info1, col_info2, col_info3 = st.columns([1, 2, 1])
         with col_info2:
-            st.info("✓ Search active. Scroll down and use 'Discover More' to find additional leads.")
+            st.info("Scroll down and use 'Discover More' to find additional leads.")
             if st.button("Reset Search", use_container_width=True, key="reset_search"):
                 st.session_state.first_discovery_done = False
                 st.session_state.dashboard_results = []
@@ -952,7 +952,7 @@ def run_dashboard():
         col_dl1, col_dl2, col_dl3 = st.columns([1, 2, 1])
         with col_dl2:
             st.download_button(
-                label="Download Leads as CSV",
+                label="Import Leads to Excel",
                 data=csv,
                 file_name="uae_investor_leads.csv",
                 mime="text/csv",
@@ -963,7 +963,7 @@ def run_dashboard():
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown(
             "<p style='text-align: center; color: #9CA3AF; font-size: 0.875rem; padding: 20px 0;'>"
-            "Leads Dashboard UAE"
+            "TekhLeads Dashboard for UAE Investor Discovery"
             "</p>", 
             unsafe_allow_html=True
         )   
