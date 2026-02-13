@@ -55,8 +55,8 @@ MOCK_LEADS_BATCH_1 = [
     },
     {
         "name": "Poonam Sharma",
-        "title": "Poonam Sharma - Director of Manufacturing• Entrepreneur | LinkedIn",
-        "snippet": "Director of Manufacturing• Entrepreneur • Internet of Things • Angel Investor · MANUFACTURING EXPERT Poonam is a seasoned manufacturing expert committed to turning impactful ideas into reality and driving humanity forward into the future.",
+        "title": "Poonam Sharma - Entrepreneur | LinkedIn",
+        "snippet": "Entrepreneur • Internet of Things • Angel Investor · MANUFACTURING EXPERT Poonam is a seasoned manufacturing expert committed to turning impactful ideas into reality and driving humanity forward into the future.",
         "url": "https://in.linkedin.com/in/poonamsh17",
         "enriched_company": ""
     },
