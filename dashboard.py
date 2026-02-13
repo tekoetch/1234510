@@ -3,6 +3,7 @@ from ddgs import DDGS
 import pandas as pd
 import re
 import time
+import random
 
 from first_pass import (score_text, identity_keywords, behavior_keywords, uae_keywords, mena_keywords, seniority_keywords)
 import second_pass
@@ -116,7 +117,7 @@ def run_dashboard():
     
     .badge-seniority {
         background-color: #DBEAFE;
-        color: #92400E;
+        color: #1E40AF;
         border: 1px solid #93C5FD;
     }
     
@@ -446,6 +447,15 @@ def run_dashboard():
         
         # ==================== DEMO MODE BRANCH ====================
         if demo_mode_active:
+            # Scroll to top of page when discovery starts
+            st.markdown(
+                """
+                <script>
+                    window.parent.document.querySelector('section.main').scrollTo(0, 0);
+                </script>
+                """,
+                unsafe_allow_html=True
+            )
             # Safety check - ensure mock leads are available
             if not MOCK_LEADS_AVAILABLE or not MOCK_LEADS_BATCH_1:
                 st.error("Mock leads not found! Make sure mock_leads.py is in the same folder.")
@@ -483,10 +493,6 @@ def run_dashboard():
                     # Use mock enriched company if provided
                     if mock_lead.get("enriched_company"):
                         enriched_company = mock_lead["enriched_company"]
-
-                    # Use fixed score if provided (for consistent demo)
-                    if mock_lead.get("fixed_score"):
-                        score = mock_lead["fixed_score"]
                     
                     name = mock_lead["name"]
                     
@@ -525,6 +531,9 @@ def run_dashboard():
                         
                         # Simulate verification delay (1.5 seconds per name)
                         time.sleep(1.5)
+                        # Simulate verification delay (random 1-3 seconds per name)
+                        delay = random.uniform(1.0, 3.0)
+                        time.sleep(delay)
                         
                         # Simulate second pass scoring (simplified for demo)
                         temp_second_pass.append({
