@@ -150,12 +150,12 @@ def score_text(text, query, url=""):
         ))
 
         # Title format: "Name - Company | LinkedIn" or "Name @ Company"
-    title_company = re.findall(
-        r'\b([A-Z][A-Za-z0-9 &\.\-]{2,50})\s*[-@]\s*(?:[A-Z][A-Za-z0-9 &\.\-]{2,50})\s*\|\s*LinkedIn',
-        text_original,
-        re.IGNORECASE
-    )
-    company_candidates.extend(title_company)
+        title_company = re.findall(
+            r'\b[A-Z][A-Za-z0-9 &\.\-]{2,50}\s*[-@]\s*(.*?)\s*\|\s*LinkedIn',
+            text_original,
+            re.IGNORECASE
+        )
+        company_candidates.extend(title_company)
 
     # STRONG global founder / C-level patterns (allowed globally)
     company_candidates.extend(re.findall(
