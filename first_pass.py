@@ -26,7 +26,7 @@ behavior_keywords = [
 
 seniority_keywords = [
     "partner", "managing director", "chairman",
-    "board member", "advisor", "advisory", "chair"
+    "board member", "advisor", "advisory", "chair",
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
@@ -142,12 +142,20 @@ def score_text(text, query, url=""):
 
         # Role @ Company (LinkedIn-style, case-insensitive company)
         company_candidates.extend(re.findall(
-            r"\b(?:head|lead|director|manager|vp|chief)\b[^@]{0,40}"
+            r"\b(?:head|lead|director|manager|vp|chief|growth|role|partner|ceo|cio)\b[^@]{0,40}"
             r"(?:@| at | for )\s*"
             r"([A-Za-z][A-Za-z0-9 &.\-]{2,50})",
             s,
             re.IGNORECASE
         ))
+
+        # Title format: "Name - Company | LinkedIn" or "Name @ Company"
+    title_company = re.findall(
+        r'\b([A-Z][A-Za-z0-9 &\.\-]{2,50})\s*[-@]\s*(?:[A-Z][A-Za-z0-9 &\.\-]{2,50})\s*\|\s*LinkedIn',
+        text_original,
+        re.IGNORECASE
+    )
+    company_candidates.extend(title_company)
 
     # STRONG global founder / C-level patterns (allowed globally)
     company_candidates.extend(re.findall(
@@ -255,7 +263,7 @@ def score_text(text, query, url=""):
         score += GEO_GROUP_BONUS
         breakdown.append("UAE LinkedIn domain (+0.6)")
     elif score >= 5.0 and "Geography" not in signal_groups:
-        score -= 1.1
+        score -= 1.2 #changed from 1.1 because Matt H. got 5 with Location United States
         breakdown.append("High score without geography confirmation (-1.1)")
 
     if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in", "pk.linkedin.com/in"]):
