@@ -536,7 +536,7 @@ else:
                     #"ML_Final_Score": ml_avg,
                     "Investor Confirmed": investor_confirmed,
                     "UAE Confirmed": uae_confirmed,
-                    "Enriched Company": truncate_company(row.get("Enriched Company", "")),
+                    "Enriched Company": final_company,
                     "Enriched Social": enriched_social,
                     "First Pass Score": round(first_pass_score, 1),
                     "Second Pass Score": round(second_pass_total, 1),
