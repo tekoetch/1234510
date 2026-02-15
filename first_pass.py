@@ -31,7 +31,7 @@ seniority_keywords = [
 
 filter_list = [
     "entrepreneur", "fractional", "chief executive officer",
-    "self-employed", "self employed", "angel investor"
+    "self-employed", "self employed", "angel investing", "cfo"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
