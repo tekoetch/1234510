@@ -19,7 +19,11 @@ NOISE_DOMAINS = [
     "www.science.gov", "cryptonews.com", "blog.founderfirst.org",
     "abcnews.go.com", "www.wamda.com", "www.startupresearcher.com",
     "www.cbnme.com", "www.standard.co.uk", "diamondclubwestcoast.com",
-    "www.theguardian.com", "cointelegraph.com"
+    "www.theguardian.com", "cointelegraph.com", "www.menaangelinvestor.com",
+    "finanshels.com", "www.easmea.com", "www.gulftalent.com", "www.tahawultech.com",
+    "www.ainalemirate.com", "www.globalstartups.club", "ticker.finology.in",
+    "www.pacermonitor.com", "blog.teamwave.com", "finanshels.com", "www.bloomberg.com",
+    "www.folk.app", "/blog", "/news", "/articles", "/news-events"
 ]
 
 # Domains that provide "Contact Info Available" signals (Bonus)
@@ -100,6 +104,9 @@ def score_second_pass(text, url, state):
     Scores verification results using the new 1-10 Scale.
     """
     t = text.lower()
+    # Block Google's "Missing:" and "Show results with:" artifacts
+    if "missing:" in t or "show results with:" in t:
+        return 0, ["Search artifact ignored"], False
     score = 0
     breakdown = []
     
@@ -124,7 +131,7 @@ def score_second_pass(text, url, state):
             return 0, ["LinkedIn adds no new information"], False
         
     if "linkedin.com" in url:
-        if state["linkedin_hits"] >= 5:
+        if state["linkedin_hits"] >= 4:
             return 0, ["LinkedIn limit reached"], False
         state["linkedin_hits"] += 1
 
