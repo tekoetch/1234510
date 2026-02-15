@@ -73,8 +73,13 @@ def build_second_pass_queries(name, anchors, enriched_company=""):
 
     # Priority 1: Name + Enriched Company (Strongest)
     if enriched_company:
-         queries.append(f'{quoted_name} "{enriched_company}"')
-    
+        clean_second = enriched_company.split("|")[0].strip()
+        clean_second = clean_second.split(",")[0].strip()
+        words = clean_second.split()
+        clean_second = " ".join(words[:5])
+
+        queries.append(f'{quoted_name} "{clean_second}"')
+
     # Priority 3: Name + Extracted Company + "Investor"
     elif anchors["company"]:
         queries.append(f'{quoted_name} "{anchors["company"][0]}" investor')
@@ -104,7 +109,7 @@ def score_second_pass(text, url, state):
     Scores verification results using the new 1-10 Scale.
     """
     t = text.lower()
-    
+
     # Block Google's "Missing:" and "Show results with:" artifacts
     if "missing:" in t or "show results with:" in t:
         return 0, ["Search artifact ignored"], False
