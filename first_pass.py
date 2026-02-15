@@ -32,6 +32,17 @@ seniority_keywords = [
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf", "gcc"]
 
+def contains_bucket_keyword(text):
+    text_lower = text.lower()
+
+    for bucket in [identity_keywords]:
+        for keyword in bucket:
+            if keyword.lower() in text_lower:
+                return True
+
+    return False
+
+
 def score_text(text, query, url=""):
     breakdown = []
     signal_groups = set()
@@ -150,13 +161,43 @@ def score_text(text, query, url=""):
         ))
 
         # Title format: "Name - Company | LinkedIn" or "Name @ Company"
-        title_company = re.findall(
-            r'\b[A-Z][A-Za-z0-9 &\.\-]{2,50}\s*[-@]\s*(.*?)\s*\|\s*LinkedIn',
+        headline_matches = re.findall(
+            r'^[^\n\-@]{2,100}\s*[-@]\s*(.*?)\s*(?:\|\s*LinkedIn)?(?:\||$)',
             text_original,
-            re.IGNORECASE
+            re.MULTILINE
         )
-        company_candidates.extend(title_company)
 
+        cleaned_headlines = []
+
+        for item in headline_matches:
+            item = item.strip()
+            item = re.sub(r'\s{2,}', ' ', item)  # collapse spaces
+
+            # Remove emoji and weird symbols
+            item = re.sub(r'[^\w\s\-\&\.\,]', '', item)
+
+            cleaned_headlines.append(item)
+
+        processed_candidates = []
+
+        for item in cleaned_headlines:
+
+            # If headline has pipes, take first segment only
+            if "|" in item:
+                item = item.split("|")[0].strip()
+
+            # If multiple dash segments, take LAST segment (often company)
+            if " - " in item:
+                segments = item.split(" - ")
+                item = segments[-1].strip()
+
+            processed_candidates.append(item)
+
+        for candidate in processed_candidates:
+            if not contains_bucket_keyword(candidate):
+                if len(candidate.strip()) > 2:
+                    company_candidates.append(candidate.strip())
+    
     # STRONG global founder / C-level patterns (allowed globally)
     company_candidates.extend(re.findall(
         r'\b(?:founder|co[- ]?founder|ceo|cto|cfo|coo|director|partner|President|Chairman|Director|Member)\b'
