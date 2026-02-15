@@ -69,7 +69,23 @@ else:
     # HELPER FUNCTIONS 
 
     def normalize_url(url):
-        return url.split("?")[0].lower().strip()
+        url = url.lower().strip()
+
+        # Remove query params
+        url = url.split("?")[0]
+
+        # Remove protocol
+        url = re.sub(r'^https?://', '', url)
+
+        # Remove www or country subdomains (ae., uk., in., etc.)
+        url = re.sub(r'^([a-z]{2}\.)?linkedin\.com', 'linkedin.com', url)
+        url = re.sub(r'^www\.', '', url)
+
+        # Remove trailing slash
+        url = url.rstrip('/')
+
+        return url
+
 
     def soft_truncate_ellipsis(text: str) -> str:
         if not text: return text
@@ -134,7 +150,14 @@ else:
         
         return list(socials)
 
-    
+    def truncate_company(name):
+        if not name: return ""
+        # Split by spaces and take only the first 4 words
+        words = name.split()
+        if len(words) > 4:
+            return " ".join(words[:4]) + "..."
+        return name
+
     def clean_key(text):
         return text.strip().upper().replace(" ", "_")
     
@@ -452,6 +475,8 @@ else:
                 if not final_company and companies:
                     final_company = ", ".join(list(companies)[:1])
 
+                final_company = truncate_company(final_company)    
+
                 first_snippet = str(first_pass_row.get("Snippet", ""))
                 
                 second_snippets = ""
@@ -511,7 +536,7 @@ else:
                     #"ML_Final_Score": ml_avg,
                     "Investor Confirmed": investor_confirmed,
                     "UAE Confirmed": uae_confirmed,
-                    "Enriched Company": final_company,
+                    "Enriched Company": truncate_company(row.get("Enriched Company", "")),
                     "Enriched Social": enriched_social,
                     "First Pass Score": round(first_pass_score, 1),
                     "Second Pass Score": round(second_pass_total, 1),
