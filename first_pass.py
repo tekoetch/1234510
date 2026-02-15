@@ -32,7 +32,7 @@ seniority_keywords = [
 filter_list = [
     "entrepreneur", "fractional", "chief executive officer",
     "self-employed", "self employed", "angel investing", "cfo",
-    "managing"
+    "managing", "own", "head of sales"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
@@ -287,6 +287,23 @@ def score_text(text, query, url=""):
             continue
 
         cleaned_companies.append(comp_clean)
+
+    # FINAL GLOBAL FILTER PASS
+    filtered_companies = []
+
+    for candidate in company_candidates:
+        candidate_clean = candidate.strip()
+
+        if len(candidate_clean) <= 2:
+            continue
+
+        if contains_bucket_keyword(candidate_clean):
+            continue
+
+        filtered_companies.append(candidate_clean)
+
+    company_candidates = filtered_companies
+        
 
     # Deduplicate while preserving order
     cleaned_companies = list(dict.fromkeys(cleaned_companies))
