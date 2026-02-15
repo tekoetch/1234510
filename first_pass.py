@@ -29,15 +29,23 @@ seniority_keywords = [
     "board member", "advisor", "advisory", "chair",
 ]
 
+filter_list = [
+    "entrepreneur", "fractional", "chief executive officer",
+    "self-employed", "self employed", "angel investor"
+]
+
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf", "gcc"]
+
+def contains_whole_word(text, word):
+    return re.search(r'\b' + re.escape(word) + r'\b', text) is not None
 
 def contains_bucket_keyword(text):
     text_lower = text.lower()
 
-    for bucket in [identity_keywords]:
+    for bucket in [identity_keywords, filter_list]:
         for keyword in bucket:
-            if keyword.lower() in text_lower:
+            if contains_whole_word(text_lower, keyword.lower()):
                 return True
 
     return False
