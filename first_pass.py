@@ -32,7 +32,9 @@ seniority_keywords = [
 filter_list = [
     "entrepreneur", "fractional", "chief executive officer",
     "self-employed", "self employed", "angel investing", "cfo",
-    "managing", "own", "head of sales", "chief operating officer"
+    "managing", "own", "head of sales", "chief operating officer",
+    "strategic finance", "investment professional", "director",
+    "chief investment officer", "executive"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
@@ -357,8 +359,8 @@ def score_text(text, query, url=""):
         score += GEO_GROUP_BONUS
         breakdown.append("UAE LinkedIn domain (+0.6)")
     elif score >= 5.0 and "Geography" not in signal_groups:
-        score -= 1.2 #changed from 1.1 because Matt H. got 5 with Location United States
-        breakdown.append("High score without geography confirmation (-1.1)")
+        score -= 1.3 #changed from 1.1 because Matt H. got 5 with Location United States
+        breakdown.append("High score without geography confirmation (-1.3)")
 
     if any(dom in url for dom in ["in.linkedin.com/in", "br.linkedin.com/in", "pk.linkedin.com/in"]):
         score -= 0.3
