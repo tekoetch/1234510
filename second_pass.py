@@ -104,9 +104,33 @@ def score_second_pass(text, url, state):
     Scores verification results using the new 1-10 Scale.
     """
     t = text.lower()
+    
     # Block Google's "Missing:" and "Show results with:" artifacts
     if "missing:" in t or "show results with:" in t:
         return 0, ["Search artifact ignored"], False
+    
+    # --- NAME INTEGRITY FILTER ---
+    if state.get("expected_name"):
+        expected = state["expected_name"].strip().lower()
+        name_parts = [p for p in expected.split() if len(p) > 2]
+
+        if len(name_parts) >= 2:
+            first = name_parts[0]
+            last = name_parts[-1]
+
+            full_present = expected in t
+            first_present = first in t
+            last_present = last in t
+
+            # Require full name OR both first AND last
+            if not full_present and not (first_present and last_present):
+                return 0, ["Name integrity fail – person not mentioned in snippet"], False
+
+        else:
+            # single-name fallback (rare edge case)
+            if expected not in t:
+                return 0, ["Name integrity fail – name not mentioned"], False
+
     score = 0
     breakdown = []
     
