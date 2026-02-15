@@ -18,7 +18,7 @@ identity_keywords = [
 
 behavior_keywords = [
     "invested in", "investing in", "portfolio", "Series A",
-    "seed", "pre-seed", "early-stage", "funding", "summit"
+    "seed", "pre-seed", "early-stage", "funding", "summit",
     "venture capital", "private equity", "real estate",
     "fundraising", "investment portfolio", "wealth funds",
     "property management", "dedicated portfolio", "active"
@@ -32,11 +32,17 @@ seniority_keywords = [
 filter_list = [
     "entrepreneur", "fractional", "chief executive officer",
     "self-employed", "self employed", "angel investing", "cfo",
-    "managing", "own", "head of sales"
+    "managing", "own", "head of sales", "chief operating officer"
 ]
 
 uae_keywords = ["uae", "dubai", "abu dhabi", "emirates"]
 mena_keywords = ["mena", "middle east", "gulf", "gcc"]
+
+NON_MENA_HUBS = [
+    "india", "pakistan", "bangalore", "ahmedabad", "mumbai", "delhi", "pune",
+    "singapore", "usa", "united states", "uk", "united kingdom", "london", 
+    "san francisco", "new york", "nyc", "canada", "australia", "berlin", "europe"
+]
 
 def contains_whole_word(text, word):
     return re.search(r'\b' + re.escape(word) + r'\b', text) is not None
@@ -96,14 +102,35 @@ def score_text(text, query, url=""):
         breakdown.append("Hashtag signals: " + " | ".join(hashtag_hits))
         
     location_match = re.search(r"location:\s*([^\n|·]+)", text, re.IGNORECASE)
+    #if location_match:
+     #   loc = location_match.group(1)
+      #  if any(k in loc for k in uae_keywords + mena_keywords):
+       #     score += 0.5
+        #    breakdown.append("Explicit UAE location (+0.5)")
+        #elif any(bad in loc for bad in ["Singapore", "New York City", "United States", "UK", "London", "India", "Ahmedabad", "Mumbai"]):
+         #   score -= 1.5 
+          #  breakdown.append("Non-MENA location detected (-1.5)")
+
     if location_match:
-        loc = location_match.group(1)
-        if any(k in loc for k in uae_keywords + mena_keywords):
-            score += 0.5
-            breakdown.append("Explicit UAE location (+0.5)")
-        elif any(bad in loc for bad in ["Singapore", "New York City", "United States", "UK", "London" "India"]):
-            score -= 1.5 
-            breakdown.append("Non-MENA location detected (-1.5)")
+        loc_text = location_match.group(1).strip().lower()
+        
+        # Check if it's a GOOD location first
+        is_uae_mena = any(k in loc_text for k in uae_keywords + mena_keywords)
+        
+        if is_uae_mena:
+            score += 1.0  # Increased boost for confirmed target location
+            breakdown.append(f"Confirmed MENA Location: {loc_text} (+1.0)")
+        else:
+            # Check if it's explicitly in our known "Bad Hubs" list
+            is_bad_hub = any(bad in loc_text for bad in NON_MENA_HUBS)
+            
+            if is_bad_hub:
+                score -= 4.0  # Heavy penalty to kill the lead
+                breakdown.append(f"Non-MENA Country ({loc_text}) (-4.0)")
+            else:
+                # If a location is mentioned but it's NOT MENA, it's suspicious
+                score -= 2.0
+                breakdown.append(f"Suspicious Location: {loc_text} (-2.0)") 
 
     identity_hits = [k for k in identity_keywords if k in text]
     if identity_hits:
