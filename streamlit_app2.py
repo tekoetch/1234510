@@ -152,10 +152,10 @@ else:
 
     def truncate_company(name):
         if not name: return ""
-        # Split by spaces and take only the first 4 words
+        # Split by spaces and take only the first 5 words
         words = name.split()
-        if len(words) > 4:
-            return " ".join(words[:4]) + "..."
+        if len(words) > 5:
+            return " ".join(words[:5]) + "..."
         return name
 
     def clean_key(text):
